@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::io;
 use std::str::FromStr;
@@ -11,7 +12,7 @@ use bytes::{BufMut, BytesMut};
 
 #[derive(Debug)]
 pub struct Message {
-    pub tags: Option<String>,
+    pub tags: BTreeMap<String, String>,
     pub prefix: Option<String>,
     pub command: String,
     pub params: Vec<String>,
@@ -50,15 +51,14 @@ impl FromStr for Message {
     fn from_str(s: &str) -> Result<Message, Self::Err> {
         let mut data = s;
 
+        let mut tags = BTreeMap::new();
+
         // Parse out IRC tags
-        let tags = if data.starts_with('@') {
+        if data.starts_with('@') {
             let tags_idx = data.find(' ');
             let tags = tags_idx.map(|i| data[1..i].to_string());
             data = tags_idx.map_or("", |i| &data[i + 1..]);
-            tags
-        } else {
-            None
-        };
+        }
 
         // Parse out the prefix
         let prefix = if data.starts_with(':') {
