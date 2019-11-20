@@ -67,24 +67,12 @@ impl FromStr for Message {
             None
         };
 
-        let line_ending_len = if data.ends_with("\r\n") {
-            "\r\n"
-        } else if data.ends_with('\r') {
-            "\r"
-        } else if data.ends_with('\n') {
-            "\n"
-        } else {
-            ""
-        }
-        .len();
-
         let trailing_idx = data.find(" :");
         let trailing = if let Some(trailing_idx) = trailing_idx {
-            let trailing = data[trailing_idx + 2..data.len() - line_ending_len].to_string();
+            let trailing = data[trailing_idx + 2..data.len()].to_string();
             data = &data[..trailing_idx + 1];
             Some(trailing)
         } else {
-            data = &data[..data.len() - line_ending_len];
             None
         };
 
