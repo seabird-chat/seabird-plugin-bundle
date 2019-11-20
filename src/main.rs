@@ -20,11 +20,11 @@ struct Message {
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(tags) = self.tags {
+        if let Some(tags) = &self.tags {
             write!(f, "@{} ", tags);
         }
 
-        if let Some(prefix) = self.prefix {
+        if let Some(prefix) = &self.prefix {
             write!(f, ":{} ", prefix);
         }
 
@@ -32,7 +32,7 @@ impl fmt::Display for Message {
 
         if self.args.len() > 0 {
             let args = &self.args[..self.args.len() - 1];
-            let trailing = self.args[self.args.len() - 1];
+            let trailing = &self.args[self.args.len() - 1];
 
             for arg in args {
                 write!(f, " {}", arg);
@@ -166,7 +166,7 @@ async fn main() -> Result<(), Error> {
         let msg = lines.next().await;
 
         match msg.unwrap() {
-            Ok(msg) => println!("{}", msg),
+            Ok(msg) => println!("{}: {}", msg.command, msg),
             Err(_err) => println!("Error"),
         };
     }
