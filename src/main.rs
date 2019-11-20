@@ -21,24 +21,24 @@ struct Message {
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(tags) = &self.tags {
-            write!(f, "@{} ", tags);
+            write!(f, "@{} ", tags)?;
         }
 
         if let Some(prefix) = &self.prefix {
-            write!(f, ":{} ", prefix);
+            write!(f, ":{} ", prefix)?;
         }
 
-        write!(f, "{}", self.command);
+        write!(f, "{}", self.command)?;
 
         if self.args.len() > 0 {
             let args = &self.args[..self.args.len() - 1];
             let trailing = &self.args[self.args.len() - 1];
 
             for arg in args {
-                write!(f, " {}", arg);
+                write!(f, " {}", arg)?;
             }
 
-            write!(f, " :{}", trailing);
+            write!(f, " :{}", trailing)?;
         }
 
         Ok(())
