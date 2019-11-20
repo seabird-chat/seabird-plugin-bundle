@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use std::str::FromStr;
 
 use tokio::codec::{Decoder, Encoder, LinesCodec, LinesCodecError};
 
@@ -40,6 +41,77 @@ impl fmt::Display for Message {
     }
 }
 
+impl FromStr for Message {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Message, Self::Err> {
+        let mut data = s;
+
+        // Parse out IRC tags
+        let tags = if data.starts_with('@') {
+            let tags_idx = data.find(' ');
+            let tags = tags_idx.map(|i| data[1..i].to_string());
+            data = tags_idx.map_or("", |i| &data[i + 1..]);
+            tags
+        } else {
+            None
+        };
+
+        // Parse out the prefix
+        let prefix = if data.starts_with(':') {
+            let prefix_idx = data.find(' ');
+            let prefix = prefix_idx.map(|i| data[1..i].to_string());
+            data = prefix_idx.map_or("", |i| &data[i + 1..]);
+            prefix
+        } else {
+            None
+        };
+
+        let line_ending_len = if data.ends_with("\r\n") {
+            "\r\n"
+        } else if data.ends_with('\r') {
+            "\r"
+        } else if data.ends_with('\n') {
+            "\n"
+        } else {
+            ""
+        }
+        .len();
+
+        let trailing_idx = data.find(" :");
+        let trailing = if let Some(trailing_idx) = trailing_idx {
+            let trailing = data[trailing_idx + 2..data.len() - line_ending_len].to_string();
+            data = &data[..trailing_idx + 1];
+            Some(trailing)
+        } else {
+            data = &data[..data.len() - line_ending_len];
+            None
+        };
+
+        // If we found a space, the command is everything before the space.
+        // Otherwise, it's the whole string.
+        let command_idx = data.find(' ');
+        let command = command_idx.map_or(&data[..], |i| &data[..i]).to_string();
+        data = command_idx.map_or("", |i| &data[i + 1..]);
+
+        let mut args: Vec<String> = data
+            .split(" ")
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect();
+        if let Some(trailing) = trailing {
+            args.push(trailing);
+        }
+
+        return Ok(Message {
+            tags: tags,
+            prefix: prefix,
+            command: command,
+            args: args,
+        });
+    }
+}
+
 pub struct Codec {
     inner: LinesCodec,
 }
@@ -72,73 +144,11 @@ impl Decoder for Codec {
     fn decode(&mut self, data: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Read a single line
         let data = self.inner.decode(data)?;
-        if data.is_none() {
-            return Ok(None);
+
+        match data {
+            Some(data) => Ok(Some(data.parse::<Message>()?)),
+            None => Ok(None),
         }
-
-        let mut data = data.unwrap();
-
-        // Parse out IRC tags
-        let tags = if data.starts_with("@") {
-            let tags_idx = data.find(" ");
-            let tags = tags_idx.map(|i| String::from(&data[1..i]));
-            data = tags_idx.map_or("", |i| &data[i + 1..]).to_string();
-            tags
-        } else {
-            None
-        };
-
-        // Parse out the prefix
-        let prefix = if data.starts_with(":") {
-            let prefix_idx = data.find(" ");
-            let prefix = prefix_idx.map(|i| String::from(&data[1..i]));
-            data = prefix_idx.map_or("", |i| &data[i + 1..]).to_string();
-            prefix
-        } else {
-            None
-        };
-
-        let line_ending_len = if data.ends_with("\r\n") {
-            "\r\n"
-        } else if data.ends_with('\r') {
-            "\r"
-        } else if data.ends_with('\n') {
-            "\n"
-        } else {
-            ""
-        }
-        .len();
-
-        let trailing_idx = data.find(" :");
-        let trailing = if trailing_idx.is_some() {
-            let trailing =
-                trailing_idx.map(|i| String::from(&data[i + 2..data.len() - line_ending_len]));
-            data = trailing_idx.map_or("", |i| &data[..i + 1]).to_string();
-            trailing
-        } else {
-            data = String::from(&data[..data.len() - line_ending_len]);
-            None
-        };
-
-        let command_idx = data.find(" ");
-        let command = command_idx.map_or(&data[..], |i| &data[..i]).to_string();
-        data = command_idx.map_or("", |i| &data[i + 1..]).to_string();
-
-        let mut args: Vec<String> = data
-            .split(" ")
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-            .collect();
-        if trailing.is_some() {
-            args.push(trailing.unwrap());
-        }
-
-        return Ok(Some(Message {
-            tags: tags,
-            prefix: prefix,
-            command: command,
-            args: args,
-        }));
     }
 }
 
