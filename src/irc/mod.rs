@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::fmt;
 use std::io;
 use std::str::FromStr;
@@ -11,7 +14,7 @@ pub struct Message {
     pub tags: Option<String>,
     pub prefix: Option<String>,
     pub command: String,
-    pub args: Vec<String>,
+    pub params: Vec<String>,
 }
 
 impl fmt::Display for Message {
@@ -26,12 +29,12 @@ impl fmt::Display for Message {
 
         write!(f, "{}", self.command)?;
 
-        if self.args.len() > 0 {
-            let args = &self.args[..self.args.len() - 1];
-            let trailing = &self.args[self.args.len() - 1];
+        if self.params.len() > 0 {
+            let params = &self.params[..self.params.len() - 1];
+            let trailing = &self.params[self.params.len() - 1];
 
-            for arg in args {
-                write!(f, " {}", arg)?;
+            for param in params {
+                write!(f, " {}", param)?;
             }
 
             write!(f, " :{}", trailing)?;
@@ -82,20 +85,20 @@ impl FromStr for Message {
         let command = command_idx.map_or(&data[..], |i| &data[..i]).to_string();
         data = command_idx.map_or("", |i| &data[i + 1..]);
 
-        let mut args: Vec<String> = data
+        let mut params: Vec<String> = data
             .split(" ")
             .filter(|s| !s.is_empty())
             .map(String::from)
             .collect();
         if let Some(trailing) = trailing {
-            args.push(trailing);
+            params.push(trailing);
         }
 
         return Ok(Message {
-            tags: tags,
-            prefix: prefix,
-            command: command,
-            args: args,
+            tags,
+            prefix,
+            command,
+            params,
         });
     }
 }
