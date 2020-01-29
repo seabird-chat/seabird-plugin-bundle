@@ -1,0 +1,11 @@
+[package]
+name = "seabird"
+version = "0.1.0"
+authors = ["Kaleb Elwert <belak@coded.io>"]
+edition = "2018"
+
+[dependencies]
+env_logger = "0.7"
+irc = { git = "https://github.com/belak/irc-rs", branch = "belak-develop", default-features = false }
+futures = "0.3"
+tokio = { version = "0.2", features = [] }
