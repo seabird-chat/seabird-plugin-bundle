@@ -1,3 +1,5 @@
+cargo-features = ["rename-dependency"]
+
 [package]
 name = "seabird"
 version = "0.1.0"
@@ -5,7 +7,7 @@ authors = ["Kaleb Elwert <belak@coded.io>"]
 edition = "2018"
 
 [dependencies]
-env_logger = "0.7"
-irc = { git = "https://github.com/belak/irc-rs", branch = "belak-develop", default-features = false }
-futures = "0.3"
-tokio = { version = "0.2", features = [] }
+anyhow = "1.0"
+irc = { package = "simple-irc", git = "https://github.com/belak/simple-irc-rs" }
+thiserror = "1.0"
+tokio = { version = "0.2", features = ["macros", "net", "rt-core", "rt-threaded", "stream", "sync", "time"] }

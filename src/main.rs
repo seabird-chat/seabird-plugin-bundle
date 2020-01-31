@@ -1,34 +1,47 @@
-use futures::prelude::*;
-use irc::client::prelude::*;
+use tokio::sync::mpsc;
+use tokio::time::{delay_for, Duration};
+
+struct Message {
+    command: String,
+}
+
+impl<'a> From<irc::Message<'a>> for Message {
+    fn from(msg: irc::Message<'a>) -> Self {
+        Message {
+            command: msg.command.to_string(),
+        }
+    }
+}
+
+async fn read_task() -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+async fn send_task(mut msgs: mpsc::Receiver<String>) -> Result<(), anyhow::Error> {
+    loop {
+        delay_for(Duration::from_secs(1)).await;
+        match msgs.recv().await {
+            Some(line) => println!("GOT LINE: {}", line),
+            None => anyhow::bail!("Dead send queue"),
+        }
+    }
+}
 
 #[tokio::main]
-async fn main() -> irc::error::Result<()> {
-    // By default, env_logger doesn't give a way of filtering logs, so we set
-    // that up ourselves.
-    let env = env_logger::Env::new().filter("RUST_LOG_FILTER");
-    env_logger::init_from_env(env);
+async fn main() -> Result<(), anyhow::Error> {
+    let (mut tx_send, rx_send) = mpsc::channel(100);
 
-    let config = Config {
-        nickname: Some("seabird51".to_owned()),
-        server: Some("chat.freenode.net".to_owned()),
-        port: Some(6697),
-        use_ssl: true,
-        channels: vec!["#encoded".to_owned()],
-        ..Default::default()
-    };
+    let read = tokio::spawn(read_task());
+    let send = tokio::spawn(send_task(rx_send));
 
-    let mut client = Client::from_config(config).await?;
-    client.identify()?;
+    tx_send.send("NICK seabird51".to_string()).await?;
+    tx_send.send(format!("USER seabird 0.0.0.0 0.0.0.0 :Seabird Bot")).await?;
 
-    let mut stream = client.stream()?;
-
-    loop {
-        let message = stream.select_next_some().await?;
-
-        if let Command::PRIVMSG(ref target, ref msg) = message.command {
-            if msg.starts_with("seabird:") {
-                client.send_privmsg(target, "Hi!").unwrap();
-            }
+    match tokio::try_join!(read, send) {
+        Err(e) => {
+            println!("{}", e);
+            Ok(())
         }
+        Ok(_) => Ok(()),
     }
 }
