@@ -1,83 +1,51 @@
-use std::net::ToSocketAddrs;
-
-use native_tls::TlsConnector;
-use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
-use tokio_tls::TlsStream;
-use tokio_util::codec::FramedRead;
 
 mod codec;
-use codec::IrcCodec;
+mod context;
+mod io;
 
-async fn read_task<T>(reader: T, out: mpsc::Sender<String>) -> Result<(), anyhow::Error>
-where
-    T: AsyncRead + Unpin,
-{
-    let mut framed = FramedRead::new(reader, IrcCodec::new());
+use structopt::StructOpt;
 
-    while let Some(msg) = framed.next().await.transpose()? {
-        println!("<-- {}", msg);
-    }
+#[derive(StructOpt, Debug)]
+#[structopt(name = "seabird", about = "A simple IRC bot.")]
+struct Config {
+    host: String,
+    nick: String,
 
-    Ok(())
-}
+    #[structopt(long)]
+    user: Option<String>,
 
-async fn send_task<T>(mut writer: T, mut msgs: mpsc::Receiver<String>) -> Result<(), anyhow::Error>
-where
-    T: AsyncWrite + Unpin,
-{
-    while let Some(line) = msgs.recv().await {
-        println!("--> {}", line);
-        writer.write_all(line.as_bytes()).await?;
-        writer.write_all(b"\r\n").await?;
-    }
-
-    // TODO: this is actually an error - the send queue dried up.
-    Ok(())
-}
-
-async fn connect(
-    target: &str,
-) -> Result<
-    (
-        ReadHalf<TlsStream<TcpStream>>,
-        WriteHalf<TlsStream<TcpStream>>,
-    ),
-    anyhow::Error,
-> {
-    let addr = target
-        .to_socket_addrs()?
-        .next()
-        .ok_or(anyhow::anyhow!("Failed to look up address"))?;
-
-    let socket = TcpStream::connect(&addr).await?;
-    let cx = TlsConnector::builder()
-        .danger_accept_invalid_certs(true)
-        .build()?;
-    let cx = tokio_tls::TlsConnector::from(cx);
-
-    let socket = cx.connect(target, socket).await?;
-
-    let (reader, writer) = tokio::io::split(socket);
-
-    Ok((reader, writer))
+    #[structopt(long)]
+    name: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let (reader, writer) = connect("chat.freenode.net:6697").await?;
+    // Load our config from command line arguments
+    let config = Config::from_args();
+
+    let (reader, writer) = io::connect(&config.host[..]).await?;
 
     let (mut tx_send, rx_send) = mpsc::channel(100);
 
-    let read = tokio::spawn(read_task(reader, tx_send.clone()));
-    let send = tokio::spawn(send_task(writer, rx_send));
-
-    tx_send.send("NICK seabird51".to_string()).await?;
+    // Queue up the registration messages. Note that we need to do this manually
+    // to avoid tx_send living past where it is given to the read_task.
+    tx_send.send(format!("NICK :{}", &config.nick)).await?;
     tx_send
-        .send(format!("USER seabird 0.0.0.0 0.0.0.0 :Seabird Bot"))
+        .send(format!(
+            "USER {} 0.0.0.0 0.0.0.0 :{}",
+            config.user.as_ref().unwrap_or(&config.nick),
+            config
+                .name
+                .as_ref()
+                .or(config.user.as_ref())
+                .unwrap_or(&config.nick)
+        ))
         .await?;
+
+    // Start the read and write tasks.
+    let read = tokio::spawn(io::read_task(reader, tx_send));
+    let send = tokio::spawn(io::send_task(writer, rx_send));
 
     match tokio::try_join!(read, send) {
         Err(e) => {
