@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
+async-trait = "0.1"
 bytes = "0.5"
 irc = { package = "simple-irc", version = "0.2.1" }
 native-tls = "0.2"

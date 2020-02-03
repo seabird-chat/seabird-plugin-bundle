@@ -13,8 +13,6 @@ impl IrcCodec {
     }
 }
 
-impl Unpin for IrcCodec {}
-
 impl Decoder for IrcCodec {
     type Error = anyhow::Error;
     type Item = irc::Message;
