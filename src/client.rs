@@ -1,5 +1,6 @@
 use std::net::ToSocketAddrs;
 
+use futures::future::try_join_all;
 use native_tls::TlsConnector;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -10,7 +11,7 @@ use tokio_util::codec::FramedRead;
 use crate::codec::IrcCodec;
 use crate::{Plugin, Result};
 
-use crate::core::{Ping, Welcome};
+use crate::core::Core;
 
 pub struct ClientConfig {
     pub target: String,
@@ -21,7 +22,7 @@ pub struct ClientConfig {
 
 pub struct Client {
     config: ClientConfig,
-    core_plugins: Vec<Box<dyn Plugin>>,
+    core: Core,
     plugins: Vec<Box<dyn Plugin>>,
 }
 
@@ -31,7 +32,7 @@ impl Client {
 
         Client {
             config,
-            core_plugins: vec![Box::new(Ping::new()), Box::new(Welcome::new())],
+            core: Core::new(),
             plugins,
         }
     }
@@ -71,8 +72,7 @@ impl Client {
 }
 
 impl Client {
-    async fn register_task(mut tx_send: mpsc::Sender<String>, config: &ClientConfig) -> Result<()>
-    {
+    async fn register_task(mut tx_send: mpsc::Sender<String>, config: &ClientConfig) -> Result<()> {
         tx_send.send(format!("NICK :{}", &config.nick)).await?;
         tx_send
             .send(format!(
@@ -98,24 +98,15 @@ impl Client {
 
             let ctx = Context::new(msg, tx_send.clone());
 
-            // Run through all core plugins before less important plugins.
-            let plugins: Vec<_> = client
-                .core_plugins
-                .iter()
-                .map(|p| p.handle_message(&ctx))
-                .collect();
-            for plugin in plugins {
-                plugin.await?;
-            }
+            // Run any core handlers before plugins.
+            tokio::try_join!(client.core.handle_message(&ctx))?;
 
             let plugins: Vec<_> = client
                 .plugins
                 .iter()
                 .map(|p| p.handle_message(&ctx))
                 .collect();
-            for plugin in plugins {
-                plugin.await?;
-            }
+            try_join_all(plugins).await?;
         }
 
         Ok(())
