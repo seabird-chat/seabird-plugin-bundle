@@ -1,8 +1,12 @@
-use tokio::sync::mpsc;
-
+mod client;
 mod codec;
-mod context;
-mod io;
+mod core;
+mod error;
+mod plugin;
+
+use client::Context;
+use error::Result;
+use plugin::Plugin;
 
 use structopt::StructOpt;
 
@@ -20,13 +24,13 @@ struct Config {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<()> {
     // Load our config from command line arguments
     let config = Config::from_args();
 
-    let (reader, writer) = io::connect(&config.host[..]).await?;
+    client::Client::new(&config.host[..]).await?;
 
-    let (mut tx_send, rx_send) = mpsc::channel(100);
+    /*
 
     // Queue up the registration messages. Note that we need to do this manually
     // to avoid tx_send living past where it is given to the read_task.
@@ -43,15 +47,7 @@ async fn main() -> Result<(), anyhow::Error> {
         ))
         .await?;
 
-    // Start the read and write tasks.
-    let read = tokio::spawn(io::read_task(reader, tx_send));
-    let send = tokio::spawn(io::send_task(writer, rx_send));
+    */
 
-    match tokio::try_join!(read, send) {
-        Err(e) => {
-            println!("{}", e);
-            Ok(())
-        }
-        Ok(_) => Ok(()),
-    }
+    Ok(())
 }
