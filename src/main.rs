@@ -2,10 +2,12 @@ mod client;
 mod codec;
 mod core;
 mod error;
+mod message;
 mod plugin;
 
 use client::Context;
 use error::Result;
+use message::{Message, Command};
 use plugin::Plugin;
 
 use structopt::StructOpt;
@@ -33,7 +35,8 @@ impl Into<client::ClientConfig> for Config {
                 .name
                 .as_ref()
                 .or_else(|| self.user.as_ref())
-                .unwrap_or(&self.nick).to_string(),
+                .unwrap_or(&self.nick)
+                .to_string(),
         }
     }
 }
