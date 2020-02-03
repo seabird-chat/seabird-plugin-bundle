@@ -2,43 +2,30 @@ use async_trait::async_trait;
 
 use crate::{Context, Plugin, Result};
 
-pub struct Ping {}
+pub struct Core {}
 
-impl Ping {
-    pub fn new() -> Ping {
-        Ping {}
+impl Core {
+    pub fn new() -> Core {
+        Core {}
     }
 }
 
 #[async_trait]
-impl Plugin for Ping {
+impl Plugin for Core {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        if let "PING" = &ctx.msg.command[..] {
-            ctx.send_msg(&irc::Message::new(
-                "PONG".to_string(),
-                ctx.msg.params.clone(),
-            ))
-            .await?
-        }
-
-        Ok(())
-    }
-}
-
-pub struct Welcome {}
-
-impl Welcome {
-    pub fn new() -> Self {
-        Welcome {}
-    }
-}
-
-#[async_trait]
-impl Plugin for Welcome {
-    async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        if let "001" = &ctx.msg.command[..] {
-            ctx.send("JOIN", vec!["#encoded-test"]).await?;
-            ctx.send("JOIN", vec!["#rust"]).await?;
+        match &ctx.msg.command[..] {
+            "PING" => {
+                ctx.send_msg(&irc::Message::new(
+                    "PONG".to_string(),
+                    ctx.msg.params.clone(),
+                ))
+                .await?;
+            }
+            "001" => {
+                ctx.send("JOIN", vec!["#encoded-test"]).await?;
+                ctx.send("JOIN", vec!["#rust"]).await?;
+            }
+            _ => {},
         }
 
         Ok(())
