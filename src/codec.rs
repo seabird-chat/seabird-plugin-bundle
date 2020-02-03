@@ -1,6 +1,8 @@
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, LinesCodec};
 
+use crate::Message;
+
 pub(crate) struct IrcCodec {
     inner: LinesCodec,
 }
@@ -15,7 +17,7 @@ impl IrcCodec {
 
 impl Decoder for IrcCodec {
     type Error = anyhow::Error;
-    type Item = irc::Message;
+    type Item = Message;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(line) = self.inner.decode(src)? {
