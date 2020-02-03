@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
 
 use crate::codec::IrcCodec;
-use crate::{Plugin, Result};
+use crate::{Message, Plugin, Result};
 
 use crate::core::Core;
 
@@ -128,12 +128,12 @@ impl Client {
 }
 
 pub struct Context {
-    pub msg: irc::Message,
+    pub msg: Message,
     sender: mpsc::Sender<String>,
 }
 
 impl Context {
-    fn new(msg: irc::Message, sender: mpsc::Sender<String>) -> Self {
+    fn new(msg: Message, sender: mpsc::Sender<String>) -> Self {
         Context { msg, sender }
     }
 
