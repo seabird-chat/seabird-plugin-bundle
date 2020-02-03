@@ -63,6 +63,9 @@ impl Client {
 
         let (send, read) = tokio::try_join!(send, read)?;
 
+        send?;
+        read?;
+
         Ok(())
     }
 }

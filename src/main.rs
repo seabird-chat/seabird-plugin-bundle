@@ -26,13 +26,13 @@ struct Config {
 impl Into<client::ClientConfig> for Config {
     fn into(self) -> client::ClientConfig {
         client::ClientConfig {
-            target: self.host,
+            target: self.host.to_string(),
             nick: self.nick.to_string(),
             user: self.user.as_ref().unwrap_or(&self.nick).to_string(),
             name: self
                 .name
                 .as_ref()
-                .or(self.user.as_ref())
+                .or_else(|| self.user.as_ref())
                 .unwrap_or(&self.nick).to_string(),
         }
     }

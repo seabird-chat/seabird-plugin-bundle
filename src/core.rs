@@ -13,15 +13,12 @@ impl Ping {
 #[async_trait]
 impl Plugin for Ping {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match &ctx.msg.command[..] {
-            "PING" => {
-                ctx.send_msg(&irc::Message::new(
-                    "PONG".to_string(),
-                    ctx.msg.params.clone(),
-                ))
-                .await?
-            }
-            _ => {}
+        if let "PING" = &ctx.msg.command[..] {
+            ctx.send_msg(&irc::Message::new(
+                "PONG".to_string(),
+                ctx.msg.params.clone(),
+            ))
+            .await?
         }
 
         Ok(())
@@ -39,12 +36,9 @@ impl Welcome {
 #[async_trait]
 impl Plugin for Welcome {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match &ctx.msg.command[..] {
-            "001" => {
-                ctx.send("JOIN", vec!["#encoded-test"]).await?;
-                ctx.send("JOIN", vec!["#rust"]).await?;
-            }
-            _ => {}
+        if let "001" = &ctx.msg.command[..] {
+            ctx.send("JOIN", vec!["#encoded-test"]).await?;
+            ctx.send("JOIN", vec!["#rust"]).await?;
         }
 
         Ok(())
