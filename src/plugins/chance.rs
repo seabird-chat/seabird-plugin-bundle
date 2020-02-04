@@ -44,9 +44,9 @@ impl Plugin for Chance {
 
                 let msg = if shot { "BANG!" } else { "Click." };
                 if reloaded {
-                    ctx.reply(&format!("Reloading the gun... {}", msg)[..]).await?;
+                    ctx.mention_reply(&format!("Reloading the gun... {}", msg)[..]).await?;
                 } else {
-                    ctx.reply(msg).await?;
+                    ctx.mention_reply(msg).await?;
                 }
             }
             _ => {}

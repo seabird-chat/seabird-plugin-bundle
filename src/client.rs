@@ -171,27 +171,56 @@ impl Context {
         }
     }
 
-    pub async fn reply(&self, msg: &str) -> Result<()> {
+    pub fn reply_target(&self) -> Result<&str> {
         match (&self.msg.command[..], self.msg.params.len()) {
-            ("PRIVMSG", 2) => {
-                // If the target is not the current nick, we need to respond to
-                // the target. Otherwise, we need to respond to the nick portion
-                // of the source.
-                let target = if self.msg.params[0] != &self.current_nick[..] {
-                    &self.msg.params[0][..]
-                } else {
-                    &self
-                        .msg
-                        .prefix
-                        .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
-                        .nick[..]
-                };
-
-                self.send("PRIVMSG", vec![target, msg]).await
-            }
-            _ => Err(anyhow::anyhow!("Tried to respond to an invalid message")),
+            // If the first param is not the current nick, we need to respond to
+            // the target, otherwise the prefix's nick.
+            ("PRIVMSG", 2) => Ok(if self.msg.params[0] != &self.current_nick[..] {
+                &self.msg.params[0][..]
+            } else {
+                &self
+                    .msg
+                    .prefix
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                    .nick[..]
+            }),
+            _ => Err(anyhow::anyhow!(
+                "Tried to find a target for an invalid message"
+            )),
         }
+    }
+
+    pub fn sender(&self) -> Result<&str> {
+        match (&self.msg.command[..], self.msg.params.len()) {
+            // Only return the prefix if it came from a valid message.
+            ("PRIVMSG", 2) => Ok(&self
+                .msg
+                .prefix
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                .nick[..]),
+            _ => Err(anyhow::anyhow!(
+                "Tried to find a sender for an invalid message"
+            )),
+        }
+    }
+
+    pub async fn mention_reply(&self, msg: &str) -> Result<()> {
+        let sender = self.sender()?;
+        let target = self.reply_target()?;
+
+        // If the target matches the sender, it's a privmsg so we shouldn't send
+        // a prefix.
+        if target == sender {
+            self.send("PRIVMSG", vec![target, msg]).await
+        } else {
+            self.send("PRIVMSG", vec![target, &format!("{}: {}", sender, msg)[..]]).await
+        }
+    }
+
+    pub async fn reply(&self, msg: &str) -> Result<()> {
+        self.send("PRIVMSG", vec![self.reply_target()?, msg]).await
     }
 
     pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
