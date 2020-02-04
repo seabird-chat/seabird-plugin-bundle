@@ -36,7 +36,6 @@ impl ClientState {
             }
             Event::RPL_WELCOME(client, _) => {
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
-                ctx.send("JOIN", vec!["#rust"]).await?;
 
                 // Copy what the server called us.
                 self.current_nick = client.to_string();
@@ -185,7 +184,8 @@ impl Context {
                         .msg
                         .prefix
                         .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?[..]
+                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                        .nick[..]
                 };
 
                 self.send("PRIVMSG", vec![target, msg]).await

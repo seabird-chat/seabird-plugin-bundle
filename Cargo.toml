@@ -13,7 +13,7 @@ anyhow = "1.0"
 async-trait = "0.1"
 bytes = "0.5"
 futures = "0.3"
-irc = { package = "simple-irc", version = "0.2.1" }
+irc = { package = "simple-irc", version = "0.3" }
 native-tls = "0.2"
 thiserror = "1.0"
 structopt = "0.3"
