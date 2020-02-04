@@ -9,9 +9,8 @@ use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
 
 use crate::codec::IrcCodec;
-use crate::{Message, Plugin, Result};
-
-use crate::core::Core;
+use crate::plugins;
+use crate::{Event, Plugin, Result};
 
 pub struct ClientConfig {
     pub target: String,
@@ -22,19 +21,46 @@ pub struct ClientConfig {
 
 pub struct Client {
     config: ClientConfig,
-    core: Core,
     plugins: Vec<Box<dyn Plugin>>,
+}
+
+struct ClientState {
+    current_nick: String,
+}
+
+impl ClientState {
+    async fn handle_message(&mut self, ctx: &mut Context) -> Result<()> {
+        match ctx.as_event() {
+            Event::Raw("PING", params) => {
+                ctx.send("PONG", params).await?;
+            }
+            Event::RPL_WELCOME(client, _) => {
+                ctx.send("JOIN", vec!["#encoded-test"]).await?;
+                ctx.send("JOIN", vec!["#rust"]).await?;
+
+                // Copy what the server called us.
+                self.current_nick = client.to_string();
+                ctx.current_nick = client.to_string();
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
 }
 
 impl Client {
     pub fn new(config: ClientConfig) -> Self {
-        let plugins = Vec::new();
+        let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
-        Client {
-            config,
-            core: Core::new(),
-            plugins,
+        #[cfg(feature = "db")]
+        {
+            plugins.push(Box::new(Karma::new()));
         }
+
+        plugins.push(Box::new(plugins::Chance::new()));
+
+        Client { config, plugins }
     }
 
     pub async fn run(self) -> Result<()> {
@@ -90,16 +116,20 @@ impl Client {
     {
         Self::register_task(tx_send.clone(), &client.config).await?;
 
+        let mut state = ClientState {
+            current_nick: client.config.nick.clone(),
+        };
+
         // Read all messages as irc::Messages.
         let mut framed = FramedRead::new(reader, IrcCodec::new());
 
         while let Some(msg) = framed.next().await.transpose()? {
             println!("<-- {}", msg);
 
-            let ctx = Context::new(msg, tx_send.clone());
+            let mut ctx = Context::new(msg, state.current_nick.clone(), tx_send.clone());
 
             // Run any core handlers before plugins.
-            tokio::try_join!(client.core.handle_message(&ctx))?;
+            state.handle_message(&mut ctx).await?;
 
             let plugins: Vec<_> = client
                 .plugins
@@ -128,13 +158,40 @@ impl Client {
 }
 
 pub struct Context {
-    pub msg: Message,
+    pub msg: irc::Message,
     sender: mpsc::Sender<String>,
+    current_nick: String,
 }
 
 impl Context {
-    fn new(msg: Message, sender: mpsc::Sender<String>) -> Self {
-        Context { msg, sender }
+    fn new(msg: irc::Message, current_nick: String, sender: mpsc::Sender<String>) -> Self {
+        Context {
+            msg,
+            current_nick,
+            sender,
+        }
+    }
+
+    pub async fn reply(&self, msg: &str) -> Result<()> {
+        match (&self.msg.command[..], self.msg.params.len()) {
+            ("PRIVMSG", 2) => {
+                // If the target is not the current nick, we need to respond to
+                // the target. Otherwise, we need to respond to the nick portion
+                // of the source.
+                let target = if self.msg.params[0] != &self.current_nick[..] {
+                    &self.msg.params[0][..]
+                } else {
+                    &self
+                        .msg
+                        .prefix
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?[..]
+                };
+
+                self.send("PRIVMSG", vec![target, msg]).await
+            }
+            _ => Err(anyhow::anyhow!("Tried to respond to an invalid message")),
+        }
     }
 
     pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
@@ -148,5 +205,9 @@ impl Context {
     pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
         self.sender.clone().send(msg.to_string()).await?;
         Ok(())
+    }
+
+    pub fn as_event(&self) -> Event<'_> {
+        (&self.msg).into()
     }
 }

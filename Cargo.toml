@@ -4,7 +4,11 @@ version = "0.1.0"
 authors = ["Kaleb Elwert <belak@coded.io>"]
 edition = "2018"
 
+[features]
+db = ["diesel"]
+
 [dependencies]
+# Core dependencies
 anyhow = "1.0"
 async-trait = "0.1"
 bytes = "0.5"
@@ -13,6 +17,10 @@ irc = { package = "simple-irc", version = "0.2.1" }
 native-tls = "0.2"
 thiserror = "1.0"
 structopt = "0.3"
-tokio = { version = "0.2", features = ["io-util", "macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
+tokio = { version = "0.2", features = ["io-util", "blocking", "macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
 tokio-tls = "0.3"
 tokio-util = { version = "0.2", features = ["codec"] }
+
+# Plugin dependencies
+diesel = { version = "1.4", optional = true }
+rand = "0.7"
