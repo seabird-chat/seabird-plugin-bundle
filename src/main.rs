@@ -1,13 +1,14 @@
 mod client;
 mod codec;
-mod core;
 mod error;
-mod message;
+mod event;
 mod plugin;
+
+mod plugins;
 
 use client::Context;
 use error::Result;
-use message::{Message, Command};
+use event::Event;
 use plugin::Plugin;
 
 use structopt::StructOpt;

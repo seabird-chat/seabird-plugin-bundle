@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, LinesCodec};
 
-use crate::Message;
+use irc::Message;
 
 pub(crate) struct IrcCodec {
     inner: LinesCodec,
