@@ -8,20 +8,35 @@ use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
 
+#[cfg(feature = "db")]
+use diesel::{r2d2, PgConnection};
+
 use crate::codec::IrcCodec;
 use crate::plugins;
-use crate::{Event, Plugin, Result};
+use crate::prelude::*;
+
+#[cfg(feature = "db")]
+embed_migrations!("./migrations/");
+
+#[cfg(feature = "db")]
+type Pool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
 
 pub struct ClientConfig {
     pub target: String,
     pub nick: String,
     pub user: String,
     pub name: String,
+
+    #[cfg(feature = "db")]
+    pub db_url: String,
 }
 
 pub struct Client {
     config: ClientConfig,
     plugins: Vec<Box<dyn Plugin>>,
+
+    #[cfg(feature = "db")]
+    db_pool: Pool,
 }
 
 struct ClientState {
@@ -34,7 +49,7 @@ impl ClientState {
             Event::Raw("PING", params) => {
                 ctx.send("PONG", params).await?;
             }
-            Event::RPL_WELCOME(client, _) => {
+            Event::RplWelcome(client, _) => {
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
 
                 // Copy what the server called us.
@@ -49,17 +64,29 @@ impl ClientState {
 }
 
 impl Client {
-    pub fn new(config: ClientConfig) -> Self {
+    pub fn new(config: ClientConfig) -> Result<Self> {
         let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
+        plugins.push(Box::new(plugins::ChancePlugin::new()));
+
         #[cfg(feature = "db")]
-        {
-            plugins.push(Box::new(Karma::new()));
-        }
+        let db_pool = {
+            plugins.push(Box::new(plugins::KarmaPlugin::new()));
 
-        plugins.push(Box::new(plugins::Chance::new()));
+            let db_pool = Pool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
 
-        Client { config, plugins }
+            // Run all migrations
+            embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
+
+            db_pool
+        };
+
+        Ok(Client {
+            config,
+            plugins,
+            #[cfg(feature = "db")]
+            db_pool,
+        })
     }
 
     pub async fn run(self) -> Result<()> {
@@ -125,7 +152,13 @@ impl Client {
         while let Some(msg) = framed.next().await.transpose()? {
             println!("<-- {}", msg);
 
-            let mut ctx = Context::new(msg, state.current_nick.clone(), tx_send.clone());
+            let mut ctx = Context::new(
+                msg,
+                state.current_nick.clone(),
+                tx_send.clone(),
+                #[cfg(feature = "db")]
+                client.db_pool.clone(),
+            );
 
             // Run any core handlers before plugins.
             state.handle_message(&mut ctx).await?;
@@ -160,14 +193,23 @@ pub struct Context {
     pub msg: irc::Message,
     sender: mpsc::Sender<String>,
     current_nick: String,
+    #[cfg(feature = "db")]
+    pub db_pool: Pool,
 }
 
 impl Context {
-    fn new(msg: irc::Message, current_nick: String, sender: mpsc::Sender<String>) -> Self {
+    fn new(
+        msg: irc::Message,
+        current_nick: String,
+        sender: mpsc::Sender<String>,
+        #[cfg(feature = "db")] db_pool: Pool,
+    ) -> Self {
         Context {
             msg,
             current_nick,
             sender,
+            #[cfg(feature = "db")]
+            db_pool,
         }
     }
 
@@ -215,7 +257,8 @@ impl Context {
         if target == sender {
             self.send("PRIVMSG", vec![target, msg]).await
         } else {
-            self.send("PRIVMSG", vec![target, &format!("{}: {}", sender, msg)[..]]).await
+            self.send("PRIVMSG", vec![target, &format!("{}: {}", sender, msg)[..]])
+                .await
         }
     }
 
