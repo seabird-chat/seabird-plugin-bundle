@@ -7,6 +7,7 @@ use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
+use uuid::Uuid;
 
 #[cfg(feature = "db")]
 use diesel::{r2d2, PgConnection};
@@ -199,6 +200,7 @@ pub struct Context {
     current_nick: String,
     #[cfg(feature = "db")]
     pub db_pool: DbPool,
+    pub id: Uuid,
 }
 
 impl Context {
@@ -214,6 +216,7 @@ impl Context {
             sender,
             #[cfg(feature = "db")]
             db_pool,
+            id: Uuid::new_v4(),
         }
     }
 
