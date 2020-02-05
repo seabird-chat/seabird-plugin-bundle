@@ -1,29 +1,26 @@
+#[macro_use]
+extern crate diesel;
+
+#[macro_use]
+extern crate diesel_migrations;
+
 mod client;
 mod codec;
 mod error;
 mod event;
 mod plugin;
-
 mod plugins;
+mod prelude;
 
-use client::Context;
-use error::Result;
-use event::Event;
-use plugin::Plugin;
+#[cfg(feature = "db")]
+mod schema;
 
-use structopt::StructOpt;
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "seabird", about = "A simple IRC bot.")]
 struct Config {
     host: String,
     nick: String,
-
-    #[structopt(long)]
     user: Option<String>,
-
-    #[structopt(long)]
     name: Option<String>,
+    db_url: String,
 }
 
 impl Into<client::ClientConfig> for Config {
@@ -38,15 +35,28 @@ impl Into<client::ClientConfig> for Config {
                 .or_else(|| self.user.as_ref())
                 .unwrap_or(&self.nick)
                 .to_string(),
+            db_url: self.db_url,
         }
     }
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Load our config from command line arguments
-    let config = Config::from_args();
+async fn main() -> error::Result<()> {
+    // We ignore failures here because we want to fall back to loading from the
+    // environment.
+    if let Ok(path) = dotenv::dotenv() {
+        println!("Loading env from {:?}", path);
+    }
 
-    let client = client::Client::new(config.into());
+    // Load our config from command line arguments
+    let config = Config {
+        host: dotenv::var("IRC_URL")?,
+        nick: dotenv::var("SEABIRD_NICK")?,
+        user: dotenv::var("SEABIRD_USER").ok(),
+        name: dotenv::var("SEABIRD_NAME").ok(),
+        db_url: dotenv::var("DATABASE_URL")?,
+    };
+
+    let client = client::Client::new(config.into())?;
     client.run().await
 }

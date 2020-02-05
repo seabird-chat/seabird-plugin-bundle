@@ -2,7 +2,7 @@
 mod karma;
 
 #[cfg(feature = "db")]
-pub use karma::Karma;
+pub use karma::KarmaPlugin;
 
 mod chance;
-pub use chance::Chance;
+pub use chance::ChancePlugin;
