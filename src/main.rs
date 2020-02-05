@@ -1,6 +1,8 @@
+#[cfg(feature = "db")]
 #[macro_use]
 extern crate diesel;
 
+#[cfg(feature = "db")]
 #[macro_use]
 extern crate diesel_migrations;
 
@@ -20,7 +22,29 @@ struct Config {
     nick: String,
     user: Option<String>,
     name: Option<String>,
+
+    #[cfg(feature = "db")]
     db_url: String,
+}
+
+impl Config {
+    fn new(
+        host: String,
+        nick: String,
+        user: Option<String>,
+        name: Option<String>,
+        #[cfg(feature = "db")] db_url: String,
+    ) -> Self {
+        Config {
+            host,
+            nick,
+            user,
+            name,
+
+            #[cfg(feature = "db")]
+            db_url,
+        }
+    }
 }
 
 impl Into<client::ClientConfig> for Config {
@@ -35,6 +59,7 @@ impl Into<client::ClientConfig> for Config {
                 .or_else(|| self.user.as_ref())
                 .unwrap_or(&self.nick)
                 .to_string(),
+            #[cfg(feature = "db")]
             db_url: self.db_url,
         }
     }
@@ -49,13 +74,14 @@ async fn main() -> error::Result<()> {
     }
 
     // Load our config from command line arguments
-    let config = Config {
-        host: dotenv::var("IRC_URL")?,
-        nick: dotenv::var("SEABIRD_NICK")?,
-        user: dotenv::var("SEABIRD_USER").ok(),
-        name: dotenv::var("SEABIRD_NAME").ok(),
-        db_url: dotenv::var("DATABASE_URL")?,
-    };
+    let config = Config::new(
+        dotenv::var("IRC_URL")?,
+        dotenv::var("SEABIRD_NICK")?,
+        dotenv::var("SEABIRD_USER").ok(),
+        dotenv::var("SEABIRD_NAME").ok(),
+        #[cfg(feature = "db")]
+        dotenv::var("DATABASE_URL")?,
+    );
 
     let client = client::Client::new(config.into())?;
     client.run().await

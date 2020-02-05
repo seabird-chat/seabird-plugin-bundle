@@ -1,6 +1,5 @@
 use std::net::ToSocketAddrs;
 
-use diesel::{r2d2, PgConnection};
 use futures::future::try_join_all;
 use native_tls::TlsConnector;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -9,12 +8,17 @@ use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
 
+#[cfg(feature = "db")]
+use diesel::{r2d2, PgConnection};
+
 use crate::codec::IrcCodec;
 use crate::plugins;
 use crate::prelude::*;
 
+#[cfg(feature = "db")]
 embed_migrations!("./migrations/");
 
+#[cfg(feature = "db")]
 type Pool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
 
 pub struct ClientConfig {
@@ -23,6 +27,7 @@ pub struct ClientConfig {
     pub user: String,
     pub name: String,
 
+    #[cfg(feature = "db")]
     pub db_url: String,
 }
 
@@ -151,6 +156,7 @@ impl Client {
                 msg,
                 state.current_nick.clone(),
                 tx_send.clone(),
+                #[cfg(feature = "db")]
                 client.db_pool.clone(),
             );
 
@@ -187,6 +193,7 @@ pub struct Context {
     pub msg: irc::Message,
     sender: mpsc::Sender<String>,
     current_nick: String,
+    #[cfg(feature = "db")]
     pub db_pool: Pool,
 }
 
@@ -195,12 +202,13 @@ impl Context {
         msg: irc::Message,
         current_nick: String,
         sender: mpsc::Sender<String>,
-        db_pool: Pool,
+        #[cfg(feature = "db")] db_pool: Pool,
     ) -> Self {
         Context {
             msg,
             current_nick,
             sender,
+            #[cfg(feature = "db")]
             db_pool,
         }
     }
