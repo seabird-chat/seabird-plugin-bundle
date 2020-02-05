@@ -75,7 +75,7 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = Config::new(
-        dotenv::var("IRC_URL")?,
+        dotenv::var("SEABIRD_HOST")?,
         dotenv::var("SEABIRD_NICK")?,
         dotenv::var("SEABIRD_USER").ok(),
         dotenv::var("SEABIRD_NAME").ok(),
