@@ -7,6 +7,8 @@ use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::codec::FramedRead;
+use tracing::{field, trace, trace_span};
+use tracing_futures::Instrument;
 use uuid::Uuid;
 
 #[cfg(feature = "db")]
@@ -22,6 +24,21 @@ embed_migrations!("./migrations/");
 #[cfg(feature = "db")]
 pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
 pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
+
+#[derive(Debug)]
+struct ToSend {
+    message: String,
+    source_message_id: Option<Uuid>,
+}
+
+impl ToSend {
+    fn bare(message: &str) -> Self {
+        Self {
+            message: message.to_string(),
+            source_message_id: None,
+        }
+    }
+}
 
 pub struct ClientConfig {
     pub target: String,
@@ -57,6 +74,8 @@ impl ClientState {
                 // Copy what the server called us.
                 self.current_nick = client.to_string();
                 ctx.current_nick = client.to_string();
+
+                trace!("Setting current nick to \"{}\"", self.current_nick);
             }
             _ => {}
         }
@@ -127,19 +146,21 @@ impl Client {
 }
 
 impl Client {
-    async fn register_task(mut tx_send: mpsc::Sender<String>, config: &ClientConfig) -> Result<()> {
-        tx_send.send(format!("NICK :{}", &config.nick)).await?;
+    async fn register_task(mut tx_send: mpsc::Sender<ToSend>, config: &ClientConfig) -> Result<()> {
         tx_send
-            .send(format!(
+            .send(ToSend::bare(&format!("NICK :{}", &config.nick)))
+            .await?;
+        tx_send
+            .send(ToSend::bare(&format!(
                 "USER {} 0.0.0.0 0.0.0.0 :{}",
                 &config.user, &config.name
-            ))
+            )))
             .await?;
 
         Ok(())
     }
 
-    async fn read_task<R>(reader: R, tx_send: mpsc::Sender<String>, client: Client) -> Result<()>
+    async fn read_task<R>(reader: R, tx_send: mpsc::Sender<ToSend>, client: Client) -> Result<()>
     where
         R: AsyncRead + Unpin,
     {
@@ -153,8 +174,6 @@ impl Client {
         let mut framed = FramedRead::new(reader, IrcCodec::new());
 
         while let Some(msg) = framed.next().await.transpose()? {
-            println!("<-- {}", msg);
-
             let mut ctx = Context::new(
                 msg,
                 state.current_nick.clone(),
@@ -162,14 +181,21 @@ impl Client {
                 #[cfg(feature = "db")]
                 client.db_pool.clone(),
             );
+            let message_span = trace_span!("recv", id = field::debug(ctx.id));
+            let _enter = message_span.enter();
+
+            trace!("<-- {}", ctx.msg);
 
             // Run any core handlers before plugins.
-            state.handle_message(&mut ctx).await?;
+            state
+                .handle_message(&mut ctx)
+                .instrument(trace_span!("core"))
+                .await?;
 
             let plugins: Vec<_> = client
                 .plugins
                 .iter()
-                .map(|p| p.handle_message(&ctx))
+                .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
                 .collect();
             let _results = try_join_all(plugins).await?;
             //println!("{:?}", results);
@@ -178,13 +204,22 @@ impl Client {
         Ok(())
     }
 
-    async fn send_task<T>(mut writer: T, mut msgs: mpsc::Receiver<String>) -> Result<()>
+    async fn send_task<T>(mut writer: T, mut msgs: mpsc::Receiver<ToSend>) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
-        while let Some(line) = msgs.recv().await {
-            println!("--> {}", line);
-            writer.write_all(line.as_bytes()).await?;
+        while let Some(to_send) = msgs.recv().await {
+            let source = field::debug(
+                to_send
+                    .source_message_id
+                    .map(|id| id.to_string())
+                    .unwrap_or("none".to_string()),
+            );
+            let span = trace_span!("send", source_id = source);
+            let _enter = span.enter();
+
+            trace!("--> {}", to_send.message);
+            writer.write_all(to_send.message.as_bytes()).await?;
             writer.write_all(b"\r\n").await?;
         }
 
@@ -196,7 +231,7 @@ impl Client {
 #[derive(Clone)]
 pub struct Context {
     pub msg: irc::Message,
-    sender: mpsc::Sender<String>,
+    sender: mpsc::Sender<ToSend>,
     current_nick: String,
     #[cfg(feature = "db")]
     pub db_pool: DbPool,
@@ -207,7 +242,7 @@ impl Context {
     fn new(
         msg: irc::Message,
         current_nick: String,
-        sender: mpsc::Sender<String>,
+        sender: mpsc::Sender<ToSend>,
         #[cfg(feature = "db")] db_pool: DbPool,
     ) -> Self {
         Context {
@@ -282,7 +317,13 @@ impl Context {
     }
 
     pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
-        self.sender.clone().send(msg.to_string()).await?;
+        self.sender
+            .clone()
+            .send(ToSend {
+                message: msg.to_string(),
+                source_message_id: Some(self.id.clone()),
+            })
+            .await?;
         Ok(())
     }
 
