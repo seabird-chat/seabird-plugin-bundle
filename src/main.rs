@@ -6,6 +6,9 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
+
 mod client;
 mod codec;
 mod error;
@@ -67,10 +70,26 @@ impl Into<client::ClientConfig> for Config {
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
+    // We need to try loading the dotenv up here so the log level can be pulled
+    // from here.
+    let dotenv_result = dotenv::dotenv();
+
+    let mut subscriber = FmtSubscriber::builder().with_max_level(
+        dotenv::var("SEABIRD_LOG_LEVEL")
+            .unwrap_or_else(|_| "trace".to_string())
+            .parse::<Level>()?,
+    );
+
+    // If we have a tty in stdout, make sure to enable fancy colors.
+    subscriber = subscriber.with_ansi(atty::is(atty::Stream::Stdout));
+
+    // Install this subscriber as the default.
+    subscriber.init();
+
     // We ignore failures here because we want to fall back to loading from the
     // environment.
-    if let Ok(path) = dotenv::dotenv() {
-        println!("Loading env from {:?}", path);
+    if let Ok(path) = dotenv_result {
+        info!("Loaded env from {:?}", path);
     }
 
     // Load our config from command line arguments
