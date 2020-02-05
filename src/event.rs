@@ -13,13 +13,13 @@ pub enum Event<'a> {
     Raw(&'a str, Vec<&'a str>),
 }
 
-impl<'a> From<&'a irc::Message> for Event<'a> {
-    fn from(msg: &'a irc::Message) -> Self {
+impl<'a> Event<'a> {
+    pub fn from_message(command_prefix: &str, msg: &'a irc::Message) -> Self {
         match (&msg.command[..], msg.params.len()) {
             ("PRIVMSG", 2) => {
                 let message = &msg.params[1][..];
-                if message.starts_with('!') {
-                    let mut parts = message[1..].splitn(2, ' ');
+                if message.starts_with(command_prefix) {
+                    let mut parts = message[command_prefix.len()..].splitn(2, ' ');
                     let cmd = parts.next().unwrap_or("");
                     let arg = parts.next().unwrap_or("").trim();
                     Event::Command(cmd, if arg.is_empty() { None } else { Some(arg) })
