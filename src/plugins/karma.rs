@@ -2,64 +2,43 @@ use std::convert::TryInto;
 
 use async_trait::async_trait;
 use diesel::prelude::*;
-use diesel::result::OptionalExtension;
 use diesel::Queryable;
 use regex::Regex;
 
 use crate::prelude::*;
-use crate::schema::karma::dsl as karma;
+use crate::schema::karma;
 
 #[derive(Queryable)]
 pub struct Karma {
-    pub id: i32,
     pub name: String,
     pub score: i32,
 }
 
+type AllColumns = (karma::name, karma::score);
+pub const ALL_COLUMNS: AllColumns = (karma::name, karma::score);
+
+impl Karma {
+    fn get_by_name(conn: &DbConn, name: &str) -> Result<Option<Self>> {
+        Ok(karma::table
+            .select(ALL_COLUMNS)
+            .filter(karma::name.eq(name))
+            .first::<Karma>(conn)
+            .optional()?)
+    }
+
+    fn create_or_update(conn: &DbConn, name: &str, score: i32) -> Result<Self> {
+        Ok(diesel::insert_into(karma::table)
+            .values((karma::name.eq(name), karma::score.eq(score)))
+            .on_conflict(karma::name)
+            .do_update()
+            .set(karma::score.eq(karma::score + score))
+            .returning(ALL_COLUMNS)
+            .get_result(conn)?)
+    }
+}
+
 pub struct KarmaPlugin {
     re: Regex,
-}
-
-#[async_trait]
-trait KarmaExt {
-    async fn get_karma(&self, name: String) -> Result<i32>;
-    async fn update_karma(&self, name: String, change: i32) -> Result<i32>;
-}
-
-#[async_trait]
-impl KarmaExt for DbPool {
-    async fn get_karma(&self, name: String) -> Result<i32> {
-        let conn = self.get()?;
-
-        Ok(tokio::task::spawn_blocking(move || {
-            karma::karma
-                .filter(karma::name.eq(name))
-                .first::<Karma>(&conn)
-                .optional()
-        })
-        .await??
-        .map_or(0, |k| k.score))
-    }
-
-    async fn update_karma(&self, name: String, change: i32) -> Result<i32> {
-        let conn = self.get()?;
-
-        Ok(tokio::task::spawn_blocking(move || {
-            diesel::insert_into(karma::karma)
-                .values((karma::name.eq(&name), karma::score.eq(change)))
-                .on_conflict(karma::name)
-                .do_update()
-                .set(karma::score.eq(karma::score + change))
-                .execute(&conn)?;
-
-            karma::karma
-                .filter(karma::name.eq(&name))
-                .first::<Karma>(&conn)
-                .optional()
-        })
-        .await??
-        .map_or(0, |k| k.score))
-    }
 }
 
 impl KarmaPlugin {
@@ -75,28 +54,40 @@ impl Plugin for KarmaPlugin {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {
-                let arg = arg.to_string();
+                let inner_arg = arg.to_string();
 
-                let karma_result = ctx.db_pool.get_karma(arg.clone()).await?;
+                let conn = ctx.db_pool.get()?;
+                let karma_result =
+                    tokio::task::spawn_blocking(move || Karma::get_by_name(&conn, &inner_arg[..]))
+                        .await??
+                        .map_or(0, |k| k.score);
+
                 ctx.mention_reply(&format!("{}'s karma is {}", arg, karma_result))
                     .await?;
             }
             Event::Privmsg(_, msg) => {
                 let captures: Vec<_> = self.re.captures_iter(msg).collect();
 
-                for capture in captures {
-                    let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
-                    if capture[2].starts_with('-') {
-                        change *= -1;
+                if !captures.is_empty() {
+                    for capture in captures {
+                        let name = capture[1].to_string();
+                        let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
+                        if capture[2].starts_with('-') {
+                            change *= -1;
+                        }
+
+                        let conn = ctx.db_pool.get()?;
+                        let karma_result = tokio::task::spawn_blocking(move || {
+                            Karma::create_or_update(&conn, &name[..], change)
+                        })
+                        .await??;
+
+                        ctx.reply(&format!(
+                            "{}'s karma is now {}",
+                            karma_result.name, karma_result.score
+                        ))
+                        .await?;
                     }
-
-                    let karma_result = ctx
-                        .db_pool
-                        .update_karma(capture[1].to_string(), change)
-                        .await?;
-
-                    ctx.reply(&format!("{}'s karma is now {}", &capture[1], karma_result))
-                        .await?;
                 }
             }
             _ => {}

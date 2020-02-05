@@ -20,6 +20,7 @@ embed_migrations!("./migrations/");
 
 #[cfg(feature = "db")]
 pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
 
 pub struct ClientConfig {
     pub target: String,
