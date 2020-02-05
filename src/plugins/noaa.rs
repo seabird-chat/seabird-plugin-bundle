@@ -38,7 +38,10 @@ impl Plugin for NoaaPlugin {
                 // Because the first line is the date, we need to skip it.
                 let mut lines = std::io::Cursor::new(data).lines();
                 let _ = lines.next();
-                let line = lines.next().transpose()?.ok_or_else(|| anyhow::anyhow!("No results"))?;
+                let line = lines
+                    .next()
+                    .transpose()?
+                    .ok_or_else(|| anyhow::anyhow!("No results"))?;
 
                 ctx.mention_reply(&line[..]).await?;
             }
