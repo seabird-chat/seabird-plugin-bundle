@@ -23,6 +23,7 @@ thiserror = "1.0"
 tokio = { version = "0.2", features = ["io-util", "blocking", "macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
 tokio-tls = "0.3"
 tokio-util = { version = "0.2", features = ["codec"] }
+uuid = { version = "0.8", features = ["v4"] }
 
 # Plugin dependencies
 diesel = { version = "1.4", features = ["postgres", "r2d2"], optional = true }
