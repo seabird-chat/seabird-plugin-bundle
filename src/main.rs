@@ -6,6 +6,9 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
+
 mod client;
 mod codec;
 mod error;
@@ -67,10 +70,15 @@ impl Into<client::ClientConfig> for Config {
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+
     // We ignore failures here because we want to fall back to loading from the
     // environment.
     if let Ok(path) = dotenv::dotenv() {
-        println!("Loading env from {:?}", path);
+        info!("Loading env {:?}", path);
     }
 
     // Load our config from command line arguments

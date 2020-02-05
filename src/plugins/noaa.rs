@@ -1,6 +1,8 @@
 use std::io::BufRead;
+use std::time::Instant;
 
 use async_trait::async_trait;
+use tracing::trace;
 
 use crate::prelude::*;
 
@@ -24,6 +26,7 @@ impl Plugin for NoaaPlugin {
                 let mut station = station.to_string();
                 station.make_ascii_uppercase();
 
+                let start = Instant::now();
                 let data = reqwest::get(
                     &format!(
                         "{}/observations/metar/stations/{}.TXT",
@@ -34,6 +37,11 @@ impl Plugin for NoaaPlugin {
                 .error_for_status()?
                 .text()
                 .await?;
+                trace!(
+                    "Got station information for {} in {}ms",
+                    station,
+                    start.elapsed().as_millis()
+                );
 
                 // Because the first line is the date, we need to skip it.
                 let mut lines = std::io::Cursor::new(data).lines();
