@@ -19,7 +19,8 @@ use crate::prelude::*;
 embed_migrations!("./migrations/");
 
 #[cfg(feature = "db")]
-type Pool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
 
 pub struct ClientConfig {
     pub target: String,
@@ -36,7 +37,7 @@ pub struct Client {
     plugins: Vec<Box<dyn Plugin>>,
 
     #[cfg(feature = "db")]
-    db_pool: Pool,
+    db_pool: DbPool,
 }
 
 struct ClientState {
@@ -73,7 +74,7 @@ impl Client {
         let db_pool = {
             plugins.push(Box::new(plugins::KarmaPlugin::new()));
 
-            let db_pool = Pool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
+            let db_pool = DbPool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
 
             // Run all migrations
             embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
@@ -194,7 +195,7 @@ pub struct Context {
     sender: mpsc::Sender<String>,
     current_nick: String,
     #[cfg(feature = "db")]
-    pub db_pool: Pool,
+    pub db_pool: DbPool,
 }
 
 impl Context {
@@ -202,7 +203,7 @@ impl Context {
         msg: irc::Message,
         current_nick: String,
         sender: mpsc::Sender<String>,
-        #[cfg(feature = "db")] db_pool: Pool,
+        #[cfg(feature = "db")] db_pool: DbPool,
     ) -> Self {
         Context {
             msg,

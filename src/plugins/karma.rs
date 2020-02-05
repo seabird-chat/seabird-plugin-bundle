@@ -1,6 +1,7 @@
+use std::convert::TryInto;
+
 use async_trait::async_trait;
 use diesel::prelude::*;
-use diesel::result::OptionalExtension;
 use diesel::Queryable;
 use regex::Regex;
 
@@ -9,9 +10,31 @@ use crate::schema::karma;
 
 #[derive(Queryable)]
 pub struct Karma {
-    pub id: i32,
     pub name: String,
     pub score: i32,
+}
+
+type AllColumns = (karma::name, karma::score);
+pub const ALL_COLUMNS: AllColumns = (karma::name, karma::score);
+
+impl Karma {
+    fn get_by_name(conn: &DbConn, name: &str) -> Result<Option<Self>> {
+        Ok(karma::table
+            .select(ALL_COLUMNS)
+            .filter(karma::name.eq(name))
+            .first::<Karma>(conn)
+            .optional()?)
+    }
+
+    fn create_or_update(conn: &DbConn, name: &str, score: i32) -> Result<Self> {
+        Ok(diesel::insert_into(karma::table)
+            .values((karma::name.eq(name), karma::score.eq(score)))
+            .on_conflict(karma::name)
+            .do_update()
+            .set(karma::score.eq(karma::score + score))
+            .returning(ALL_COLUMNS)
+            .get_result(conn)?)
+    }
 }
 
 pub struct KarmaPlugin {
@@ -29,30 +52,41 @@ impl KarmaPlugin {
 #[async_trait]
 impl Plugin for KarmaPlugin {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        let conn = ctx.db_pool.get()?;
-
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {
-                let arg = arg.to_string();
+                let inner_arg = arg.to_string();
 
-                let karma_result = tokio::task::spawn_blocking(move || {
-                    karma::table
-                        .filter(karma::columns::name.eq(arg))
-                        .first::<Karma>(&conn)
-                        .optional()
-                })
-                .await??;
+                let conn = ctx.db_pool.get()?;
+                let karma_result =
+                    tokio::task::spawn_blocking(move || Karma::get_by_name(&conn, &inner_arg[..]))
+                        .await??
+                        .map_or(0, |k| k.score);
 
-                if let Some(k) = karma_result {
-                    ctx.mention_reply(&format!("{}'s karma is {}", k.name, k.score))
-                        .await?;
-                }
+                ctx.mention_reply(&format!("{}'s karma is {}", arg, karma_result))
+                    .await?;
             }
             Event::Privmsg(_, msg) => {
                 let captures: Vec<_> = self.re.captures_iter(msg).collect();
+
                 if !captures.is_empty() {
                     for capture in captures {
-                        println!("{} {}", &capture[1], &capture[2]);
+                        let name = capture[1].to_string();
+                        let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
+                        if capture[2].starts_with('-') {
+                            change *= -1;
+                        }
+
+                        let conn = ctx.db_pool.get()?;
+                        let karma_result = tokio::task::spawn_blocking(move || {
+                            Karma::create_or_update(&conn, &name[..], change)
+                        })
+                        .await??;
+
+                        ctx.reply(&format!(
+                            "{}'s karma is now {}",
+                            karma_result.name, karma_result.score
+                        ))
+                        .await?;
                     }
                 }
             }
