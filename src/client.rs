@@ -70,7 +70,7 @@ impl Client {
         plugins.push(Box::new(plugins::ChancePlugin::new()));
 
         #[cfg(feature = "db")]
-        {
+        let db_pool = {
             plugins.push(Box::new(plugins::KarmaPlugin::new()));
 
             let db_pool = Pool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
@@ -78,15 +78,15 @@ impl Client {
             // Run all migrations
             embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
 
-            Ok(Client {
-                config,
-                plugins,
-                db_pool,
-            })
-        }
+            db_pool
+        };
 
-        #[cfg(not(feature = "db"))]
-        Ok(Client { config, plugins })
+        Ok(Client {
+            config,
+            plugins,
+            #[cfg(feature = "db")]
+            db_pool,
+        })
     }
 
     pub async fn run(self) -> Result<()> {
