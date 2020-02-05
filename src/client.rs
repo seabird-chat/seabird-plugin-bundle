@@ -192,6 +192,7 @@ impl Client {
     }
 }
 
+#[derive(Clone)]
 pub struct Context {
     pub msg: irc::Message,
     sender: mpsc::Sender<String>,
