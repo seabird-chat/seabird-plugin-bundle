@@ -16,6 +16,8 @@
 
 6. Ensure `libpq` is available: `vcpkg_cli probe libpq`.
 
-7. Remove any previously-built `pq` bindings: `cargo clean -p pq-sys`.
+7. Add the DLL bin directory (something like `$HOME\vcpkg\isntalled\x64-windows\bin`) to your **system** `Path` environment variable.
 
-8. Build!
+8. Remove any previously-built `pq` bindings: `cargo clean -p pq-sys`.
+
+9. Build!
