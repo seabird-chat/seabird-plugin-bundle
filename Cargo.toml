@@ -12,6 +12,7 @@ db = ["diesel", "diesel_migrations"]
 # Core dependencies
 anyhow = "1.0"
 async-trait = "0.1"
+atty = "0.2"
 bytes = "0.5"
 dotenv = "0.15"
 futures = "0.3"
@@ -23,6 +24,10 @@ thiserror = "1.0"
 tokio = { version = "0.2", features = ["io-util", "blocking", "macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
 tokio-tls = "0.3"
 tokio-util = { version = "0.2", features = ["codec"] }
+tracing = "0.1"
+tracing-futures = "0.2"
+tracing-subscriber = "0.2"
+uuid = { version = "0.8", features = ["v4"] }
 
 # Plugin dependencies
 diesel = { version = "1.4", features = ["postgres", "r2d2"], optional = true }

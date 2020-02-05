@@ -6,6 +6,9 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
+use tracing::info;
+use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
+
 mod client;
 mod codec;
 mod error;
@@ -25,6 +28,8 @@ struct Config {
 
     #[cfg(feature = "db")]
     db_url: String,
+
+    include_message_id_in_logs: bool,
 }
 
 impl Config {
@@ -34,6 +39,7 @@ impl Config {
         user: Option<String>,
         name: Option<String>,
         #[cfg(feature = "db")] db_url: String,
+        include_message_id_in_logs: bool,
     ) -> Self {
         Config {
             host,
@@ -43,6 +49,8 @@ impl Config {
 
             #[cfg(feature = "db")]
             db_url,
+
+            include_message_id_in_logs,
         }
     }
 }
@@ -61,16 +69,37 @@ impl Into<client::ClientConfig> for Config {
                 .to_string(),
             #[cfg(feature = "db")]
             db_url: self.db_url,
+
+            include_message_id_in_logs: self.include_message_id_in_logs,
         }
     }
 }
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
+    // We need to try loading the dotenv up here so the log level can be pulled
+    // from here.
+    let dotenv_result = dotenv::dotenv();
+
+    let filter =
+        EnvFilter::new(dotenv::var("SEABIRD_LOG_FILTER").unwrap_or_else(|_| "".to_string()))
+            .add_directive(
+                format!(
+                    "seabird={}",
+                    dotenv::var("SEABIRD_LOG_LEVEL").unwrap_or_else(|_| "trace".to_string())
+                )
+                .parse()?,
+            );
+
+    FmtSubscriber::builder()
+        .with_env_filter(filter)
+        .with_ansi(atty::is(atty::Stream::Stdout))
+        .init();
+
     // We ignore failures here because we want to fall back to loading from the
     // environment.
-    if let Ok(path) = dotenv::dotenv() {
-        println!("Loading env from {:?}", path);
+    if let Ok(path) = dotenv_result {
+        info!("Loaded env from {:?}", path);
     }
 
     // Load our config from command line arguments
@@ -81,6 +110,9 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NAME").ok(),
         #[cfg(feature = "db")]
         dotenv::var("DATABASE_URL")?,
+        dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS")
+            .unwrap_or("true".to_string())
+            .parse::<bool>()?,
     );
 
     let client = client::Client::new(config.into())?;
