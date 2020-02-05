@@ -66,9 +66,10 @@ impl ClientState {
 
 impl Client {
     pub fn new(config: ClientConfig) -> Result<Self> {
-        let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
-
-        plugins.push(Box::new(plugins::ChancePlugin::new()));
+        let mut plugins: Vec<Box<dyn Plugin>> = vec![
+            Box::new(plugins::ChancePlugin::new()),
+            Box::new(plugins::NoaaPlugin::new()),
+        ];
 
         #[cfg(feature = "db")]
         let db_pool = {
@@ -169,7 +170,8 @@ impl Client {
                 .iter()
                 .map(|p| p.handle_message(&ctx))
                 .collect();
-            try_join_all(plugins).await?;
+            let _results = try_join_all(plugins).await?;
+            //println!("{:?}", results);
         }
 
         Ok(())
@@ -218,7 +220,7 @@ impl Context {
         match (&self.msg.command[..], self.msg.params.len()) {
             // If the first param is not the current nick, we need to respond to
             // the target, otherwise the prefix's nick.
-            ("PRIVMSG", 2) => Ok(if self.msg.params[0] != &self.current_nick[..] {
+            ("PRIVMSG", 2) => Ok(if self.msg.params[0] != self.current_nick[..] {
                 &self.msg.params[0][..]
             } else {
                 &self
