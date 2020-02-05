@@ -1,6 +1,5 @@
 table! {
-    karma (id) {
-        id -> Int4,
+    karma (name) {
         name -> Text,
         score -> Int4,
     }
