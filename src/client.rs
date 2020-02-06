@@ -32,10 +32,17 @@ struct ToSend {
 }
 
 impl ToSend {
-    fn bare(message: &str) -> Self {
+    fn raw(message: String) -> Self {
         Self {
-            message: message.to_string(),
+            message,
             source_message_id: None,
+        }
+    }
+
+    fn with_source(message: String, source_message_id: Uuid) -> Self {
+        Self {
+            message,
+            source_message_id: Some(source_message_id),
         }
     }
 }
@@ -151,10 +158,10 @@ impl Client {
 impl Client {
     async fn register_task(mut tx_send: mpsc::Sender<ToSend>, config: &ClientConfig) -> Result<()> {
         tx_send
-            .send(ToSend::bare(&format!("NICK :{}", &config.nick)))
+            .send(ToSend::raw(format!("NICK :{}", &config.nick)))
             .await?;
         tx_send
-            .send(ToSend::bare(&format!(
+            .send(ToSend::raw(format!(
                 "USER {} 0.0.0.0 0.0.0.0 :{}",
                 &config.user, &config.name
             )))
@@ -334,10 +341,7 @@ impl Context {
     pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
         self.sender
             .clone()
-            .send(ToSend {
-                message: msg.to_string(),
-                source_message_id: Some(self.id.clone()),
-            })
+            .send(ToSend::with_source(msg.to_string(), self.id.clone()))
             .await?;
         Ok(())
     }

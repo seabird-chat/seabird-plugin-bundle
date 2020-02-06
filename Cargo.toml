@@ -12,6 +12,7 @@ db = ["diesel", "diesel_migrations"]
 # Core dependencies
 anyhow = "1.0"
 async-trait = "0.1"
+atty = "0.2"
 bytes = "0.5"
 dotenv = "0.15"
 futures = "0.3"
