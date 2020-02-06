@@ -29,6 +29,8 @@ struct Config {
     #[cfg(feature = "db")]
     db_url: String,
 
+    command_prefix: String,
+
     include_message_id_in_logs: bool,
 }
 
@@ -39,6 +41,7 @@ impl Config {
         user: Option<String>,
         name: Option<String>,
         #[cfg(feature = "db")] db_url: String,
+        command_prefix: String,
         include_message_id_in_logs: bool,
     ) -> Self {
         Config {
@@ -49,6 +52,8 @@ impl Config {
 
             #[cfg(feature = "db")]
             db_url,
+
+            command_prefix,
 
             include_message_id_in_logs,
         }
@@ -69,7 +74,7 @@ impl Into<client::ClientConfig> for Config {
                 .to_string(),
             #[cfg(feature = "db")]
             db_url: self.db_url,
-
+            command_prefix: self.command_prefix,
             include_message_id_in_logs: self.include_message_id_in_logs,
         }
     }
@@ -110,6 +115,7 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NAME").ok(),
         #[cfg(feature = "db")]
         dotenv::var("DATABASE_URL")?,
+        dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or("!".to_string()),
         dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS")
             .unwrap_or("true".to_string())
             .parse::<bool>()?,
