@@ -29,7 +29,7 @@ struct Config {
     #[cfg(feature = "db")]
     db_url: String,
 
-    include_message_id_in_logs: String,
+    include_message_id_in_logs: bool,
 }
 
 impl Config {
@@ -39,7 +39,7 @@ impl Config {
         user: Option<String>,
         name: Option<String>,
         #[cfg(feature = "db")] db_url: String,
-        include_message_id_in_logs: String,
+        include_message_id_in_logs: bool,
     ) -> Self {
         Config {
             host,
@@ -70,7 +70,7 @@ impl Into<client::ClientConfig> for Config {
             #[cfg(feature = "db")]
             db_url: self.db_url,
 
-            include_message_id_in_logs: self.include_message_id_in_logs == "true",
+            include_message_id_in_logs: self.include_message_id_in_logs,
         }
     }
 }
@@ -107,7 +107,9 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NAME").ok(),
         #[cfg(feature = "db")]
         dotenv::var("DATABASE_URL")?,
-        dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS").unwrap_or("true".to_string()),
+        dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS")
+            .unwrap_or("true".to_string())
+            .parse::<bool>()?,
     );
 
     let client = client::Client::new(config.into())?;
