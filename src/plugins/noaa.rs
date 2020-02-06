@@ -21,7 +21,7 @@ impl NoaaPlugin {
 #[async_trait]
 impl Plugin for NoaaPlugin {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match ctx.as_event() {
+        match ctx.as_event().await {
             Event::Command("metar", Some(station)) => {
                 let mut station = station.to_string();
                 station.make_ascii_uppercase();

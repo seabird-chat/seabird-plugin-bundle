@@ -121,6 +121,5 @@ async fn main() -> error::Result<()> {
             .parse::<bool>()?,
     );
 
-    let client = client::Client::new(config.into())?;
-    client.run().await
+    client::run(config.into()).await
 }

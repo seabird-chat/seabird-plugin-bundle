@@ -52,11 +52,11 @@ impl KarmaPlugin {
 #[async_trait]
 impl Plugin for KarmaPlugin {
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match ctx.as_event() {
+        match ctx.as_event().await {
             Event::Command("karma", Some(arg)) => {
                 let inner_arg = arg.to_string();
 
-                let conn = ctx.db_pool.get()?;
+                let conn = ctx.client_state.lock().await.db_pool.get()?;
                 let karma_result =
                     tokio::task::spawn_blocking(move || Karma::get_by_name(&conn, &inner_arg[..]))
                         .await??
@@ -76,7 +76,7 @@ impl Plugin for KarmaPlugin {
                             change *= -1;
                         }
 
-                        let conn = ctx.db_pool.get()?;
+                        let conn = ctx.client_state.lock().await.db_pool.get()?;
                         let karma_result = tokio::task::spawn_blocking(move || {
                             Karma::create_or_update(&conn, &name[..], change)
                         })
