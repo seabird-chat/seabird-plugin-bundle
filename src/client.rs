@@ -40,6 +40,7 @@ impl ToSend {
     }
 }
 
+#[derive(Clone)]
 pub struct ClientConfig {
     pub target: String,
     pub nick: String,
@@ -48,6 +49,8 @@ pub struct ClientConfig {
 
     #[cfg(feature = "db")]
     pub db_url: String,
+
+    pub include_message_id_in_logs: bool,
 }
 
 pub struct Client {
@@ -133,7 +136,7 @@ impl Client {
         // Step 2: Wire up all the pieces
         let (tx_send, rx_send) = mpsc::channel(100);
 
-        let send = tokio::spawn(Self::send_task(writer, rx_send));
+        let send = tokio::spawn(Self::send_task(writer, rx_send, self.config.clone()));
         let read = tokio::spawn(Self::read_task(reader, tx_send.clone(), self));
 
         let (send, read) = tokio::try_join!(send, read)?;
@@ -181,7 +184,11 @@ impl Client {
                 #[cfg(feature = "db")]
                 client.db_pool.clone(),
             );
-            let message_span = trace_span!("recv", id = field::debug(ctx.id));
+            let message_span = if client.config.include_message_id_in_logs {
+                trace_span!("recv", id = field::debug(ctx.id))
+            } else {
+                trace_span!("recv")
+            };
             let _enter = message_span.enter();
 
             trace!("<-- {}", ctx.msg);
@@ -204,18 +211,26 @@ impl Client {
         Ok(())
     }
 
-    async fn send_task<T>(mut writer: T, mut msgs: mpsc::Receiver<ToSend>) -> Result<()>
+    async fn send_task<T>(
+        mut writer: T,
+        mut msgs: mpsc::Receiver<ToSend>,
+        config: ClientConfig,
+    ) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
         while let Some(to_send) = msgs.recv().await {
-            let source = field::debug(
-                to_send
-                    .source_message_id
-                    .map(|id| id.to_string())
-                    .unwrap_or("none".to_string()),
-            );
-            let span = trace_span!("send", source_id = source);
+            let span = if config.include_message_id_in_logs {
+                let source = field::debug(
+                    to_send
+                        .source_message_id
+                        .map(|id| id.to_string())
+                        .unwrap_or("none".to_string()),
+                );
+                trace_span!("send", source_id = source)
+            } else {
+                trace_span!("send")
+            };
             let _enter = span.enter();
 
             trace!("--> {}", to_send.message);
