@@ -25,8 +25,8 @@ tokio = { version = "0.2", features = ["io-util", "blocking", "macros", "tcp", "
 tokio-tls = "0.3"
 tokio-util = { version = "0.2", features = ["codec"] }
 tracing = "0.1"
-tracing-futures = "0.2.1"
-tracing-subscriber = "0.2.0"
+tracing-futures = "0.2"
+tracing-subscriber = "0.2"
 uuid = { version = "0.8", features = ["v4"] }
 
 # Plugin dependencies
