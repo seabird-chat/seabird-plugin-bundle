@@ -6,8 +6,8 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing::info;
+use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
 
 mod client;
 mod codec;
@@ -81,17 +81,20 @@ async fn main() -> error::Result<()> {
     // from here.
     let dotenv_result = dotenv::dotenv();
 
-    let mut subscriber = FmtSubscriber::builder().with_max_level(
-        dotenv::var("SEABIRD_LOG_LEVEL")
-            .unwrap_or_else(|_| "trace".to_string())
-            .parse::<Level>()?,
-    );
+    let filter =
+        EnvFilter::new(dotenv::var("SEABIRD_LOG_FILTER").unwrap_or_else(|_| "".to_string()))
+            .add_directive(
+                format!(
+                    "seabird={}",
+                    dotenv::var("SEABIRD_LOG_LEVEL").unwrap_or_else(|_| "trace".to_string())
+                )
+                .parse()?,
+            );
 
-    // If we have a tty in stdout, make sure to enable fancy colors.
-    subscriber = subscriber.with_ansi(atty::is(atty::Stream::Stdout));
-
-    // Install this subscriber as the default.
-    subscriber.init();
+    FmtSubscriber::builder()
+        .with_env_filter(filter)
+        .with_ansi(atty::is(atty::Stream::Stdout))
+        .init();
 
     // We ignore failures here because we want to fall back to loading from the
     // environment.
