@@ -57,7 +57,7 @@ pub struct ClientConfig {
     #[cfg(feature = "db")]
     pub db_url: String,
 
-    pub command_prefix: char,
+    pub command_prefix: String,
 
     pub include_message_id_in_logs: bool,
 }
@@ -190,7 +190,7 @@ impl Client {
 
         while let Some(msg) = framed.next().await.transpose()? {
             let mut ctx = Context::new(
-                client.config.command_prefix,
+                client.config.command_prefix.clone(),
                 msg,
                 state.current_nick.clone(),
                 tx_send.clone(),
@@ -258,7 +258,7 @@ impl Client {
 
 #[derive(Clone)]
 pub struct Context {
-    command_prefix: char,
+    command_prefix: String,
     pub msg: irc::Message,
     sender: mpsc::Sender<ToSend>,
     current_nick: String,
@@ -269,7 +269,7 @@ pub struct Context {
 
 impl Context {
     fn new(
-        command_prefix: char,
+        command_prefix: String,
         msg: irc::Message,
         current_nick: String,
         sender: mpsc::Sender<ToSend>,
@@ -356,6 +356,6 @@ impl Context {
     }
 
     pub fn as_event(&self) -> Event<'_> {
-        Event::from_message(self.command_prefix, &self.msg)
+        Event::from_message(&self.command_prefix, &self.msg)
     }
 }

@@ -29,7 +29,7 @@ struct Config {
     #[cfg(feature = "db")]
     db_url: String,
 
-    command_prefix: char,
+    command_prefix: String,
 
     include_message_id_in_logs: bool,
 }
@@ -41,7 +41,7 @@ impl Config {
         user: Option<String>,
         name: Option<String>,
         #[cfg(feature = "db")] db_url: String,
-        command_prefix: char,
+        command_prefix: String,
         include_message_id_in_logs: bool,
     ) -> Self {
         Config {
@@ -115,9 +115,7 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NAME").ok(),
         #[cfg(feature = "db")]
         dotenv::var("DATABASE_URL")?,
-        dotenv::var("SEABIRD_COMMAND_PREFIX")
-            .unwrap_or("!".to_string())
-            .parse::<char>()?,
+        dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or("!".to_string()),
         dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS")
             .unwrap_or("true".to_string())
             .parse::<bool>()?,
