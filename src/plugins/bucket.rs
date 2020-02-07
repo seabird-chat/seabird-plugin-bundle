@@ -86,14 +86,9 @@ impl Plugin for BucketPlugin {
             if let Some(captures) = self.re_is.captures(&arg[..]) {
                 let conn = ctx.get_db()?;
 
-                let cap1 = captures[1].to_string();
-                let cap2 = captures[2].to_string();
-                let cap3 = captures[3].to_string();
-
-                let bucket_fact_result = tokio::task::spawn_blocking(move || {
-                    BucketFact::insert(&conn, &cap1[..], &cap2[..], &cap3[..])
-                })
-                .await?;
+                let bucket_fact_result = tokio::task::block_in_place(move || {
+                    BucketFact::insert(&conn, &captures[1], &captures[2], &captures[3])
+                });
 
                 ctx.mention_reply(&format!("{:?}", bucket_fact_result)[..])
                     .await?;
