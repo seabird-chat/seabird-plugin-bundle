@@ -371,8 +371,12 @@ impl Context {
         Ok(())
     }
 
+    pub fn command_prefix(&self) -> &str {
+        &self.client_state.config.command_prefix
+    }
+
     pub fn as_event(&self) -> Event<'_> {
-        Event::from_message(&self.client_state.config.command_prefix, &self.msg)
+        Event::from_message(self.command_prefix(), &self.msg)
     }
 
     pub fn get_db(&self) -> Result<DbConn> {
