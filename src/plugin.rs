@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::client::Context;
 use crate::error::Result;
 
@@ -9,7 +11,7 @@ pub trait Plugin: Sync + Send {
         Ok(())
     }
 
-    async fn handle_message(&self, _ctx: &Context) -> Result<()> {
+    async fn handle_message(&self, _ctx: &Arc<Context>) -> Result<()> {
         Ok(())
     }
 }

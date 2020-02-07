@@ -20,8 +20,8 @@ impl NoaaPlugin {
 
 #[async_trait]
 impl Plugin for NoaaPlugin {
-    async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match ctx.as_event().await {
+    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
+        match ctx.as_event() {
             Event::Command("metar", Some(station)) => {
                 let mut station = station.to_string();
                 station.make_ascii_uppercase();
@@ -37,6 +37,7 @@ impl Plugin for NoaaPlugin {
                 .error_for_status()?
                 .text()
                 .await?;
+
                 trace!(
                     "Got station information for {} in {}ms",
                     station,

@@ -22,8 +22,8 @@ impl ChancePlugin {
 
 #[async_trait]
 impl Plugin for ChancePlugin {
-    async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        if let Event::Command("roulette", _) = ctx.as_event().await {
+    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
+        if let Event::Command("roulette", _) = ctx.as_event() {
             let (reloaded, shot) = {
                 let mut shots_left = self.shots_left.lock().await;
                 let reloaded = if *shots_left == 0 {
