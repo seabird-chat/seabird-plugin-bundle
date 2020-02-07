@@ -1,11 +1,12 @@
 use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
 use futures::future::try_join_all;
 use native_tls::TlsConnector;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::FramedRead;
 use tracing::{field, trace, trace_span};
 use tracing_futures::Instrument;
@@ -23,6 +24,7 @@ embed_migrations!("./migrations/");
 
 #[cfg(feature = "db")]
 pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+#[cfg(feature = "db")]
 pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
 
 #[derive(Debug)]
@@ -54,28 +56,32 @@ pub struct ClientConfig {
     pub user: String,
     pub name: String,
 
-    #[cfg(feature = "db")]
-    pub db_url: String,
-
     pub command_prefix: String,
 
     pub include_message_id_in_logs: bool,
-}
-
-pub struct Client {
-    config: ClientConfig,
-    plugins: Vec<Box<dyn Plugin>>,
 
     #[cfg(feature = "db")]
-    db_pool: DbPool,
+    pub db_url: String,
 }
 
-struct ClientState {
+// ClientState represents the internal state of the client at any given point in
+// time.
+pub struct ClientState {
     current_nick: String,
+    config: Arc<ClientConfig>,
 }
 
-impl ClientState {
-    async fn handle_message(&mut self, ctx: &mut Context) -> Result<()> {
+// Client represents the running bot.
+pub struct Client {
+    plugins: Vec<Box<dyn Plugin>>,
+    state: Mutex<Arc<ClientState>>,
+
+    #[cfg(feature = "db")]
+    db_pool: Arc<DbPool>,
+}
+
+impl Client {
+    async fn handle_message(&self, ctx: &Context) -> Result<()> {
         match ctx.as_event() {
             Event::Raw("PING", params) => {
                 ctx.send("PONG", params).await?;
@@ -84,156 +90,31 @@ impl ClientState {
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
 
                 // Copy what the server called us.
-                self.current_nick = client.to_string();
-                ctx.current_nick = client.to_string();
+                let mut guard = self.state.lock().await;
+                let state = &mut *guard;
+                *state = Arc::new(ClientState {
+                    current_nick: client.to_string(),
+                    config: state.config.clone(),
+                });
 
-                trace!("Setting current nick to \"{}\"", self.current_nick);
+                trace!("Setting current nick to \"{}\"", state.current_nick);
             }
             _ => {}
         }
 
         Ok(())
     }
-}
 
-impl Client {
-    pub fn new(config: ClientConfig) -> Result<Self> {
-        let mut plugins: Vec<Box<dyn Plugin>> = vec![
-            Box::new(plugins::ChancePlugin::new()),
-            Box::new(plugins::NoaaPlugin::new()),
-        ];
-
-        #[cfg(feature = "db")]
-        let db_pool = {
-            plugins.push(Box::new(plugins::KarmaPlugin::new()));
-
-            let db_pool = DbPool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
-
-            // Run all migrations
-            embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
-
-            db_pool
-        };
-
-        Ok(Client {
-            config,
-            plugins,
-            #[cfg(feature = "db")]
-            db_pool,
-        })
-    }
-
-    pub async fn run(self) -> Result<()> {
-        // Step 1: Connect to the server
-        let addr = self
-            .config
-            .target
-            .to_socket_addrs()?
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("Failed to look up address"))?;
-
-        let socket = TcpStream::connect(&addr).await?;
-        let cx = TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?;
-        let cx = tokio_tls::TlsConnector::from(cx);
-
-        let socket = cx.connect(&self.config.target, socket).await?;
-
-        let (reader, writer) = tokio::io::split(socket);
-
-        // Step 2: Wire up all the pieces
-        let (tx_send, rx_send) = mpsc::channel(100);
-
-        let send = tokio::spawn(Self::send_task(writer, rx_send, self.config.clone()));
-        let read = tokio::spawn(Self::read_task(reader, tx_send.clone(), self));
-
-        let (send, read) = tokio::try_join!(send, read)?;
-
-        send?;
-        read?;
-
-        Ok(())
-    }
-}
-
-impl Client {
-    async fn register_task(mut tx_send: mpsc::Sender<ToSend>, config: &ClientConfig) -> Result<()> {
-        tx_send
-            .send(ToSend::new_without_source(format!(
-                "NICK :{}",
-                &config.nick
-            )))
-            .await?;
-        tx_send
-            .send(ToSend::new_without_source(format!(
-                "USER {} 0.0.0.0 0.0.0.0 :{}",
-                &config.user, &config.name
-            )))
-            .await?;
-
-        Ok(())
-    }
-
-    async fn read_task<R>(reader: R, tx_send: mpsc::Sender<ToSend>, client: Client) -> Result<()>
-    where
-        R: AsyncRead + Unpin,
-    {
-        Self::register_task(tx_send.clone(), &client.config).await?;
-
-        let mut state = ClientState {
-            current_nick: client.config.nick.clone(),
-        };
-
-        // Read all messages as irc::Messages.
-        let mut framed = FramedRead::new(reader, IrcCodec::new());
-
-        while let Some(msg) = framed.next().await.transpose()? {
-            let mut ctx = Context::new(
-                client.config.command_prefix.clone(),
-                msg,
-                state.current_nick.clone(),
-                tx_send.clone(),
-                #[cfg(feature = "db")]
-                client.db_pool.clone(),
-            );
-            let message_span = if client.config.include_message_id_in_logs {
-                trace_span!("recv", id = field::debug(ctx.id))
-            } else {
-                trace_span!("recv")
-            };
-            let _enter = message_span.enter();
-
-            trace!("<-- {}", ctx.msg);
-
-            // Run any core handlers before plugins.
-            state
-                .handle_message(&mut ctx)
-                .instrument(trace_span!("core"))
-                .await?;
-
-            let plugins: Vec<_> = client
-                .plugins
-                .iter()
-                .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
-                .collect();
-            let _results = try_join_all(plugins).await?;
-            //println!("{:?}", results);
-        }
-
-        Ok(())
-    }
-
-    async fn send_task<T>(
+    async fn writer_task<T>(
+        &self,
         mut writer: T,
-        mut msgs: mpsc::Receiver<ToSend>,
-        config: ClientConfig,
+        mut rx_sender: mpsc::Receiver<ToSend>,
     ) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
-        while let Some(to_send) = msgs.recv().await {
-            let span = if config.include_message_id_in_logs {
+        while let Some(to_send) = rx_sender.recv().await {
+            let span = if self.state.lock().await.config.include_message_id_in_logs {
                 let source = field::debug(
                     to_send
                         .source_message_id
@@ -254,52 +135,186 @@ impl Client {
         // TODO: this is actually an error - the send queue dried up.
         Ok(())
     }
+
+    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<ToSend>) -> Result<()>
+    where
+        R: AsyncRead + Unpin,
+    {
+        // Read all messages as irc::Messages.
+        let mut framed = FramedRead::new(reader, IrcCodec::new());
+
+        while let Some(msg) = framed.next().await.transpose()? {
+            let mut ctx = Context::new(
+                self.state.lock().await.clone(),
+                msg,
+                tx_sender.clone(),
+                self.db_pool.clone(),
+            );
+
+            let message_span = if ctx.client_state.config.include_message_id_in_logs {
+                trace_span!("recv", id = field::debug(ctx.id))
+            } else {
+                trace_span!("recv")
+            };
+            let _enter = message_span.enter();
+
+            trace!("<-- {}", ctx.msg);
+
+            // Run any core handlers before plugins.
+            self.handle_message(&ctx)
+                .instrument(trace_span!("core"))
+                .await?;
+
+            // The state may have been changed in handle message, so we
+            // re-create it.
+            ctx.client_state = self.state.lock().await.clone();
+
+            // Create an Arc out of our context to make it easier for async
+            // plugins.
+            let ctx = Arc::new(ctx);
+
+            let plugins: Vec<_> = self
+                .plugins
+                .iter()
+                .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
+                .collect();
+            let _results = try_join_all(plugins).await?;
+
+            //println!("{:?}", results);
+        }
+
+        Ok(())
+    }
+}
+
+async fn send_startup_messages(
+    config: &ClientConfig,
+    mut tx_send: mpsc::Sender<ToSend>,
+) -> Result<()> {
+    tx_send
+        .send(ToSend::new_without_source(format!(
+            "NICK :{}",
+            &config.nick
+        )))
+        .await?;
+    tx_send
+        .send(ToSend::new_without_source(format!(
+            "USER {} 0.0.0.0 0.0.0.0 :{}",
+            &config.user, &config.name
+        )))
+        .await?;
+
+    Ok(())
+}
+
+pub async fn run(config: ClientConfig) -> Result<()> {
+    let mut plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(plugins::ChancePlugin::new()),
+        Box::new(plugins::NoaaPlugin::new()),
+    ];
+
+    #[cfg(feature = "db")]
+    let db_pool = {
+        plugins.push(Box::new(plugins::KarmaPlugin::new()));
+
+        let db_pool = DbPool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
+
+        // Run all migrations
+        embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
+
+        db_pool
+    };
+
+    // Step 1: Connect to the server
+    let addr = config
+        .target
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to look up address"))?;
+
+    let socket = TcpStream::connect(&addr).await?;
+    let cx = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()?;
+    let cx = tokio_tls::TlsConnector::from(cx);
+
+    let socket = cx.connect(&config.target, socket).await?;
+
+    let (reader, writer) = tokio::io::split(socket);
+
+    // Step 2: Wire up all the pieces
+    let (tx_sender, rx_sender) = mpsc::channel(100);
+
+    send_startup_messages(&config, tx_sender.clone()).await?;
+
+    let state = Arc::new(ClientState {
+        current_nick: config.nick.clone(),
+        config: Arc::new(config),
+    });
+
+    let client = Client {
+        plugins: plugins,
+        state: Mutex::new(state),
+        #[cfg(feature = "db")]
+        db_pool: Arc::new(db_pool),
+    };
+
+    let send = client.writer_task(writer, rx_sender);
+    let read = client.reader_task(reader, tx_sender);
+
+    let (send, read) = tokio::join!(send, read);
+
+    send?;
+    read?;
+
+    Ok(())
 }
 
 #[derive(Clone)]
 pub struct Context {
-    command_prefix: String,
     pub msg: irc::Message,
-    sender: mpsc::Sender<ToSend>,
-    current_nick: String,
-    #[cfg(feature = "db")]
-    pub db_pool: DbPool,
     pub id: Uuid,
+
+    sender: mpsc::Sender<ToSend>,
+    client_state: Arc<ClientState>,
+
+    #[cfg(feature = "db")]
+    db_pool: Arc<DbPool>,
 }
 
 impl Context {
     fn new(
-        command_prefix: String,
+        client_state: Arc<ClientState>,
         msg: irc::Message,
-        current_nick: String,
         sender: mpsc::Sender<ToSend>,
-        #[cfg(feature = "db")] db_pool: DbPool,
+        #[cfg(feature = "db")] db_pool: Arc<DbPool>,
     ) -> Self {
         Context {
-            command_prefix,
+            client_state,
             msg,
-            current_nick,
             sender,
+            id: Uuid::new_v4(),
             #[cfg(feature = "db")]
             db_pool,
-            id: Uuid::new_v4(),
         }
     }
 
-    pub fn reply_target(&self) -> Result<&str> {
+    pub async fn reply_target(&self) -> Result<&str> {
         match (&self.msg.command[..], self.msg.params.len()) {
             // If the first param is not the current nick, we need to respond to
             // the target, otherwise the prefix's nick.
-            ("PRIVMSG", 2) => Ok(if self.msg.params[0] != self.current_nick[..] {
-                &self.msg.params[0][..]
-            } else {
-                &self
-                    .msg
-                    .prefix
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
-                    .nick[..]
-            }),
+            ("PRIVMSG", 2) => Ok(
+                if self.msg.params[0] != self.client_state.current_nick[..] {
+                    &self.msg.params[0][..]
+                } else {
+                    &self
+                        .msg
+                        .prefix
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                        .nick[..]
+                },
+            ),
             _ => Err(anyhow::anyhow!(
                 "Tried to find a target for an invalid message"
             )),
@@ -323,7 +338,7 @@ impl Context {
 
     pub async fn mention_reply(&self, msg: &str) -> Result<()> {
         let sender = self.sender()?;
-        let target = self.reply_target()?;
+        let target = self.reply_target().await?;
 
         // If the target matches the sender, it's a privmsg so we shouldn't send
         // a prefix.
@@ -336,7 +351,8 @@ impl Context {
     }
 
     pub async fn reply(&self, msg: &str) -> Result<()> {
-        self.send("PRIVMSG", vec![self.reply_target()?, msg]).await
+        self.send("PRIVMSG", vec![self.reply_target().await?, msg])
+            .await
     }
 
     pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
@@ -356,6 +372,10 @@ impl Context {
     }
 
     pub fn as_event(&self) -> Event<'_> {
-        Event::from_message(&self.command_prefix, &self.msg)
+        Event::from_message(&self.client_state.config.command_prefix, &self.msg)
+    }
+
+    pub fn get_db(&self) -> Result<DbConn> {
+        Ok(self.db_pool.get()?)
     }
 }
