@@ -16,6 +16,7 @@ mod event;
 mod plugin;
 mod plugins;
 mod prelude;
+mod utils;
 
 #[cfg(feature = "db")]
 mod schema;

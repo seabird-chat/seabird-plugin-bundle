@@ -67,8 +67,8 @@ pub struct ClientConfig {
 // ClientState represents the internal state of the client at any given point in
 // time.
 pub struct ClientState {
-    current_nick: String,
-    config: Arc<ClientConfig>,
+    pub current_nick: String,
+    pub config: Arc<ClientConfig>,
 }
 
 // Client represents the running bot.
@@ -216,6 +216,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
 
     #[cfg(feature = "db")]
     let db_pool = {
+        plugins.push(Box::new(plugins::BucketPlugin::new()));
         plugins.push(Box::new(plugins::KarmaPlugin::new()));
 
         let db_pool = DbPool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
@@ -377,7 +378,7 @@ impl Context {
     }
 
     pub fn as_event(&self) -> Event<'_> {
-        Event::from_message(self.command_prefix(), &self.msg)
+        Event::from_message(self.client_state.clone(), &self.msg)
     }
 
     pub fn get_db(&self) -> Result<DbConn> {
