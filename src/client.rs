@@ -24,6 +24,7 @@ embed_migrations!("./migrations/");
 
 #[cfg(feature = "db")]
 pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
+#[cfg(feature = "db")]
 pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
 
 #[derive(Debug)]
@@ -103,6 +104,87 @@ impl Client {
 
         Ok(())
     }
+
+    async fn writer_task<T>(
+        &self,
+        mut writer: T,
+        mut rx_sender: mpsc::Receiver<ToSend>,
+    ) -> Result<()>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        while let Some(to_send) = rx_sender.recv().await {
+            let span = if self.state.lock().await.config.include_message_id_in_logs {
+                let source = field::debug(
+                    to_send
+                        .source_message_id
+                        .map(|id| id.to_string())
+                        .unwrap_or("none".to_string()),
+                );
+                trace_span!("send", source_id = source)
+            } else {
+                trace_span!("send")
+            };
+            let _enter = span.enter();
+
+            trace!("--> {}", to_send.message);
+            writer.write_all(to_send.message.as_bytes()).await?;
+            writer.write_all(b"\r\n").await?;
+        }
+
+        // TODO: this is actually an error - the send queue dried up.
+        Ok(())
+    }
+
+    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<ToSend>) -> Result<()>
+    where
+        R: AsyncRead + Unpin,
+    {
+        // Read all messages as irc::Messages.
+        let mut framed = FramedRead::new(reader, IrcCodec::new());
+
+        while let Some(msg) = framed.next().await.transpose()? {
+            let mut ctx = Context::new(
+                self.state.lock().await.clone(),
+                msg,
+                tx_sender.clone(),
+                self.db_pool.clone(),
+            );
+
+            let message_span = if ctx.client_state.config.include_message_id_in_logs {
+                trace_span!("recv", id = field::debug(ctx.id))
+            } else {
+                trace_span!("recv")
+            };
+            let _enter = message_span.enter();
+
+            trace!("<-- {}", ctx.msg);
+
+            // Run any core handlers before plugins.
+            self.handle_message(&ctx)
+                .instrument(trace_span!("core"))
+                .await?;
+
+            // The state may have been changed in handle message, so we
+            // re-create it.
+            ctx.client_state = self.state.lock().await.clone();
+
+            // Create an Arc out of our context to make it easier for async
+            // plugins.
+            let ctx = Arc::new(ctx);
+
+            let plugins: Vec<_> = self
+                .plugins
+                .iter()
+                .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
+                .collect();
+            let _results = try_join_all(plugins).await?;
+
+            //println!("{:?}", results);
+        }
+
+        Ok(())
+    }
 }
 
 async fn send_startup_messages(
@@ -170,17 +252,17 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         config: Arc::new(config),
     });
 
-    let client = Arc::new(Client {
+    let client = Client {
         plugins: plugins,
         state: Mutex::new(state),
         #[cfg(feature = "db")]
         db_pool: Arc::new(db_pool),
-    });
+    };
 
-    let send = tokio::spawn(writer_task(client.clone(), writer, rx_sender));
-    let read = tokio::spawn(reader_task(client, reader, tx_sender));
+    let send = client.writer_task(writer, rx_sender);
+    let read = client.reader_task(reader, tx_sender);
 
-    let (send, read) = tokio::try_join!(send, read)?;
+    let (send, read) = tokio::join!(send, read);
 
     send?;
     read?;
@@ -296,94 +378,4 @@ impl Context {
     pub fn get_db(&self) -> Result<DbConn> {
         Ok(self.db_pool.get()?)
     }
-}
-
-async fn reader_task<R>(
-    client: Arc<Client>,
-    reader: R,
-    tx_sender: mpsc::Sender<ToSend>,
-) -> Result<()>
-where
-    R: AsyncRead + Unpin,
-{
-    // Read all messages as irc::Messages.
-    let mut framed = FramedRead::new(reader, IrcCodec::new());
-
-    while let Some(msg) = framed.next().await.transpose()? {
-        let mut ctx = Context::new(
-            client.state.lock().await.clone(),
-            msg,
-            tx_sender.clone(),
-            client.db_pool.clone(),
-        );
-
-        let message_span = if ctx.client_state.config.include_message_id_in_logs {
-            trace_span!("recv", id = field::debug(ctx.id))
-        } else {
-            trace_span!("recv")
-        };
-        let _enter = message_span.enter();
-
-        trace!("<-- {}", ctx.msg);
-
-        // Run any core handlers before plugins.
-        client
-            .handle_message(&ctx)
-            .instrument(trace_span!("core"))
-            .await;
-
-        // The state may have been changed in handle message, so we
-        // re-create it.
-        ctx.client_state = client.state.lock().await.clone();
-
-        // Create an Arc out of our context to make it easier for async
-        // plugins.
-        let ctx = Arc::new(ctx);
-
-        // We're taking the lock recursively here and blocking forever.
-        // Maybe we can freeze the state after running core handlers
-        // and make everything read-only, and then remove the need
-        // for a lock?
-        let plugins: Vec<_> = client
-            .plugins
-            .iter()
-            .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
-            .collect();
-        let _results = try_join_all(plugins).await?;
-
-        //println!("{:?}", results);
-    }
-
-    Ok(())
-}
-
-async fn writer_task<T>(
-    client: Arc<Client>,
-    mut writer: T,
-    mut rx_sender: mpsc::Receiver<ToSend>,
-) -> Result<()>
-where
-    T: AsyncWrite + Unpin,
-{
-    while let Some(to_send) = rx_sender.recv().await {
-        let span = if client.state.lock().await.config.include_message_id_in_logs {
-            let source = field::debug(
-                to_send
-                    .source_message_id
-                    .map(|id| id.to_string())
-                    .unwrap_or("none".to_string()),
-            );
-            trace_span!("send", source_id = source)
-        } else {
-            trace_span!("send")
-        };
-        let _enter = span.enter();
-
-        trace!("--> {}", to_send.message);
-        writer.write_all(to_send.message.as_bytes()).await?;
-        writer.write_all(b"\r\n").await?;
-    }
-
-    // TODO: this is actually an error - the send queue dried up.
-    Ok(())
 }
