@@ -8,7 +8,7 @@ use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::FramedRead;
-use tracing::{field, trace, trace_span};
+use tracing::{error, field, trace, trace_span};
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
@@ -178,9 +178,10 @@ impl Client {
                 .iter()
                 .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
                 .collect();
-            let _results = try_join_all(plugins).await?;
-
-            //println!("{:?}", results);
+            // TODO: add better context around error
+            if let Err(e) = try_join_all(plugins).await {
+                error!("Plugin(s) failed to execute: {}", e);
+            }
         }
 
         Ok(())
