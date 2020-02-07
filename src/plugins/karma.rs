@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use diesel::prelude::*;
@@ -51,12 +52,12 @@ impl KarmaPlugin {
 
 #[async_trait]
 impl Plugin for KarmaPlugin {
-    async fn handle_message(&self, ctx: &Context) -> Result<()> {
+    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {
                 let inner_arg = arg.to_string();
 
-                let conn = ctx.db_pool.get()?;
+                let conn = ctx.get_db()?;
                 let karma_result =
                     tokio::task::spawn_blocking(move || Karma::get_by_name(&conn, &inner_arg[..]))
                         .await??
@@ -76,7 +77,7 @@ impl Plugin for KarmaPlugin {
                             change *= -1;
                         }
 
-                        let conn = ctx.db_pool.get()?;
+                        let conn = ctx.get_db()?;
                         let karma_result = tokio::task::spawn_blocking(move || {
                             Karma::create_or_update(&conn, &name[..], change)
                         })
