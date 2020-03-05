@@ -52,6 +52,31 @@ pub struct ClientConfig {
     pub db_url: String,
 }
 
+impl ClientConfig {
+    pub fn new(
+        host: String,
+        nick: String,
+        user: Option<String>,
+        name: Option<String>,
+        db_url: String,
+        command_prefix: String,
+        include_message_id_in_logs: bool,
+    ) -> Self {
+        let user = user.unwrap_or_else(|| nick.clone());
+        let name = name.unwrap_or_else(|| user.clone());
+
+        ClientConfig {
+            target: host,
+            nick,
+            user,
+            name,
+            db_url,
+            command_prefix,
+            include_message_id_in_logs,
+        }
+    }
+}
+
 // ClientState represents the internal state of the client at any given point in
 // time.
 pub struct ClientState {

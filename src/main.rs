@@ -10,63 +10,6 @@ mod plugin;
 mod plugins;
 mod prelude;
 
-struct Config {
-    host: String,
-    nick: String,
-    user: Option<String>,
-    name: Option<String>,
-
-    db_url: String,
-
-    command_prefix: String,
-
-    include_message_id_in_logs: bool,
-}
-
-impl Config {
-    fn new(
-        host: String,
-        nick: String,
-        user: Option<String>,
-        name: Option<String>,
-        db_url: String,
-        command_prefix: String,
-        include_message_id_in_logs: bool,
-    ) -> Self {
-        Config {
-            host,
-            nick,
-            user,
-            name,
-
-            db_url,
-
-            command_prefix,
-
-            include_message_id_in_logs,
-        }
-    }
-}
-
-impl Into<client::ClientConfig> for Config {
-    fn into(self) -> client::ClientConfig {
-        client::ClientConfig {
-            target: self.host.to_string(),
-            nick: self.nick.to_string(),
-            user: self.user.as_ref().unwrap_or(&self.nick).to_string(),
-            name: self
-                .name
-                .as_ref()
-                .or_else(|| self.user.as_ref())
-                .unwrap_or(&self.nick)
-                .to_string(),
-            db_url: self.db_url,
-            command_prefix: self.command_prefix,
-            include_message_id_in_logs: self.include_message_id_in_logs,
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> error::Result<()> {
     // We need to try loading the dotenv up here so the log level can be pulled
@@ -95,7 +38,7 @@ async fn main() -> error::Result<()> {
     }
 
     // Load our config from command line arguments
-    let config = Config::new(
+    let config = client::ClientConfig::new(
         dotenv::var("SEABIRD_HOST")?,
         dotenv::var("SEABIRD_NICK")?,
         dotenv::var("SEABIRD_USER").ok(),
