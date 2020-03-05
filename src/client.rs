@@ -70,6 +70,8 @@ impl Client {
                 ctx.send("PONG", params).await?;
             }
             Event::RplWelcome(client, _) => {
+                info!("Connected!");
+
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
 
                 // Copy what the server called us.

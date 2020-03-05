@@ -12,14 +12,11 @@ mod prelude;
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
-    pretty_env_logger::init();
-    // We need to try loading the dotenv up here so the log level can be pulled
-    // from here.
-    let dotenv_result = dotenv::dotenv();
+    pretty_env_logger::init_timed();
 
     // We ignore failures here because we want to fall back to loading from the
     // environment.
-    if let Ok(path) = dotenv_result {
+    if let Ok(path) = dotenv::dotenv() {
         info!("Loaded env from {:?}", path);
     }
 
