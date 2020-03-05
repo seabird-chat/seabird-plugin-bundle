@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use tracing::trace;
 
 use crate::prelude::*;
 
@@ -23,7 +22,7 @@ async fn lines_from_url(url: &str) -> Result<std::io::Lines<std::io::Cursor<Stri
     let start = Instant::now();
     let data = reqwest::get(url).await?.error_for_status()?.text().await?;
 
-    trace!(
+    debug!(
         "Got station information from \"{}\" in {}ms",
         url,
         start.elapsed().as_millis()

@@ -8,35 +8,10 @@ use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::codec::FramedRead;
-use tracing::{error, field, trace, trace_span};
-use tracing_futures::Instrument;
-use uuid::Uuid;
 
 use crate::codec::IrcCodec;
 use crate::plugins;
 use crate::prelude::*;
-
-#[derive(Debug)]
-struct ToSend {
-    message: String,
-    source_message_id: Option<Uuid>,
-}
-
-impl ToSend {
-    fn new_without_source(message: String) -> Self {
-        Self {
-            message,
-            source_message_id: None,
-        }
-    }
-
-    fn new(message: String, source_message_id: Uuid) -> Self {
-        Self {
-            message,
-            source_message_id: Some(source_message_id),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct ClientConfig {
@@ -46,8 +21,6 @@ pub struct ClientConfig {
     pub name: String,
 
     pub command_prefix: String,
-
-    pub include_message_id_in_logs: bool,
 
     pub db_url: String,
 }
@@ -60,7 +33,6 @@ impl ClientConfig {
         name: Option<String>,
         db_url: String,
         command_prefix: String,
-        include_message_id_in_logs: bool,
     ) -> Self {
         let user = user.unwrap_or_else(|| nick.clone());
         let name = name.unwrap_or_else(|| user.clone());
@@ -72,7 +44,6 @@ impl ClientConfig {
             name,
             db_url,
             command_prefix,
-            include_message_id_in_logs,
         }
     }
 }
@@ -109,7 +80,7 @@ impl Client {
                     config: state.config.clone(),
                 });
 
-                trace!("Setting current nick to \"{}\"", state.current_nick);
+                debug!("Setting current nick to \"{}\"", state.current_nick);
             }
             _ => {}
         }
@@ -120,27 +91,14 @@ impl Client {
     async fn writer_task<T>(
         &self,
         mut writer: T,
-        mut rx_sender: mpsc::Receiver<ToSend>,
+        mut rx_sender: mpsc::Receiver<String>,
     ) -> Result<()>
     where
         T: AsyncWrite + Unpin,
     {
-        while let Some(to_send) = rx_sender.recv().await {
-            let span = if self.state.lock().await.config.include_message_id_in_logs {
-                let source = field::debug(
-                    to_send
-                        .source_message_id
-                        .map(|id| id.to_string())
-                        .unwrap_or("none".to_string()),
-                );
-                trace_span!("send", source_id = source)
-            } else {
-                trace_span!("send")
-            };
-            let _enter = span.enter();
-
-            trace!("--> {}", to_send.message);
-            writer.write_all(to_send.message.as_bytes()).await?;
+        while let Some(message) = rx_sender.recv().await {
+            trace!("--> {}", message);
+            writer.write_all(message.as_bytes()).await?;
             writer.write_all(b"\r\n").await?;
         }
 
@@ -148,7 +106,7 @@ impl Client {
         Ok(())
     }
 
-    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<ToSend>) -> Result<()>
+    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<String>) -> Result<()>
     where
         R: AsyncRead + Unpin,
     {
@@ -163,19 +121,10 @@ impl Client {
                 self.db_client.clone(),
             );
 
-            let message_span = if ctx.client_state.config.include_message_id_in_logs {
-                trace_span!("recv", id = field::debug(ctx.id))
-            } else {
-                trace_span!("recv")
-            };
-            let _enter = message_span.enter();
-
             trace!("<-- {}", ctx.msg);
 
             // Run any core handlers before plugins.
-            self.handle_message(&ctx)
-                .instrument(trace_span!("core"))
-                .await?;
+            self.handle_message(&ctx).await?;
 
             // The state may have been changed in handle message, so we
             // re-create it.
@@ -188,7 +137,7 @@ impl Client {
             let plugins: Vec<_> = self
                 .plugins
                 .iter()
-                .map(|p| p.handle_message(&ctx).instrument(trace_span!("plugin")))
+                .map(|p| p.handle_message(&ctx))
                 .collect();
             // TODO: add better context around error
             if let Err(e) = try_join_all(plugins).await {
@@ -202,19 +151,14 @@ impl Client {
 
 async fn send_startup_messages(
     config: &ClientConfig,
-    mut tx_send: mpsc::Sender<ToSend>,
+    mut tx_send: mpsc::Sender<String>,
 ) -> Result<()> {
+    tx_send.send(format!("NICK :{}", &config.nick)).await?;
     tx_send
-        .send(ToSend::new_without_source(format!(
-            "NICK :{}",
-            &config.nick
-        )))
-        .await?;
-    tx_send
-        .send(ToSend::new_without_source(format!(
+        .send(format!(
             "USER {} 0.0.0.0 0.0.0.0 :{}",
             &config.user, &config.name
-        )))
+        ))
         .await?;
 
     Ok(())
@@ -289,9 +233,8 @@ pub async fn run(config: ClientConfig) -> Result<()> {
 #[derive(Clone)]
 pub struct Context {
     pub msg: irc::Message,
-    pub id: Uuid,
 
-    sender: mpsc::Sender<ToSend>,
+    sender: mpsc::Sender<String>,
     client_state: Arc<ClientState>,
 
     db_client: Arc<tokio_postgres::Client>,
@@ -301,14 +244,13 @@ impl Context {
     fn new(
         client_state: Arc<ClientState>,
         msg: irc::Message,
-        sender: mpsc::Sender<ToSend>,
+        sender: mpsc::Sender<String>,
         db_client: Arc<tokio_postgres::Client>,
     ) -> Self {
         Context {
             client_state,
             msg,
             sender,
-            id: Uuid::new_v4(),
             db_client,
         }
     }
@@ -378,10 +320,7 @@ impl Context {
     }
 
     pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
-        self.sender
-            .clone()
-            .send(ToSend::new(msg.to_string(), self.id.clone()))
-            .await?;
+        self.sender.clone().send(msg.to_string()).await?;
         Ok(())
     }
 
