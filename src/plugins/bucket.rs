@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use diesel::prelude::*;
-use diesel::Queryable;
 use regex::Regex;
 
 use crate::prelude::*;
-use crate::schema::bucket_facts;
 
 /*
 // These are roughly in the order that they appear in xkcd-Bucket
@@ -23,26 +20,13 @@ renderRegexp = regexp.MustCompile(`(?i)^render (.*)$`) // Custom feature
 isRegexp     = regexp.MustCompile(`(?i)^(.+?) (is|is also|are|<\w+>) (.+)$`)
 */
 
-#[derive(Queryable, Debug)]
+#[derive(Debug)]
 pub struct BucketFact {
     pub id: i32,
     pub fact: String,
     pub verb: String,
     pub tidbit: String,
 }
-
-type AllColumns = (
-    bucket_facts::id,
-    bucket_facts::fact,
-    bucket_facts::verb,
-    bucket_facts::tidbit,
-);
-pub const ALL_COLUMNS: AllColumns = (
-    bucket_facts::id,
-    bucket_facts::fact,
-    bucket_facts::verb,
-    bucket_facts::tidbit,
-);
 
 impl BucketFact {
     fn insert(conn: &DbConn, fact: &str, verb: &str, tidbit: &str) -> Result<usize> {

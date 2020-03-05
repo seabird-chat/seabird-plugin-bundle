@@ -1,4 +1,0 @@
-CREATE TABLE karma (
-    name TEXT NOT NULL PRIMARY KEY,
-    score INTEGER DEFAULT 0 NOT NULL
-);

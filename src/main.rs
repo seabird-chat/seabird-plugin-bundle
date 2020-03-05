@@ -1,11 +1,3 @@
-#[cfg(feature = "db")]
-#[macro_use]
-extern crate diesel;
-
-#[cfg(feature = "db")]
-#[macro_use]
-extern crate diesel_migrations;
-
 use tracing::info;
 use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
 
@@ -13,13 +5,10 @@ mod client;
 mod codec;
 mod error;
 mod event;
+mod migrations;
 mod plugin;
 mod plugins;
 mod prelude;
-mod utils;
-
-#[cfg(feature = "db")]
-mod schema;
 
 struct Config {
     host: String,
@@ -27,7 +16,6 @@ struct Config {
     user: Option<String>,
     name: Option<String>,
 
-    #[cfg(feature = "db")]
     db_url: String,
 
     command_prefix: String,
@@ -41,7 +29,7 @@ impl Config {
         nick: String,
         user: Option<String>,
         name: Option<String>,
-        #[cfg(feature = "db")] db_url: String,
+        db_url: String,
         command_prefix: String,
         include_message_id_in_logs: bool,
     ) -> Self {
@@ -51,7 +39,6 @@ impl Config {
             user,
             name,
 
-            #[cfg(feature = "db")]
             db_url,
 
             command_prefix,
@@ -73,7 +60,6 @@ impl Into<client::ClientConfig> for Config {
                 .or_else(|| self.user.as_ref())
                 .unwrap_or(&self.nick)
                 .to_string(),
-            #[cfg(feature = "db")]
             db_url: self.db_url,
             command_prefix: self.command_prefix,
             include_message_id_in_logs: self.include_message_id_in_logs,
@@ -114,7 +100,6 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NICK")?,
         dotenv::var("SEABIRD_USER").ok(),
         dotenv::var("SEABIRD_NAME").ok(),
-        #[cfg(feature = "db")]
         dotenv::var("DATABASE_URL")?,
         dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or("!".to_string()),
         dotenv::var("INCLUDE_MESSAGE_ID_IN_LOGS")

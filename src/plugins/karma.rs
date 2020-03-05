@@ -2,39 +2,48 @@ use std::convert::TryInto;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use diesel::prelude::*;
-use diesel::Queryable;
 use regex::Regex;
 
 use crate::prelude::*;
-use crate::schema::karma;
 
-#[derive(Queryable)]
+#[derive(Debug)]
 pub struct Karma {
     pub name: String,
     pub score: i32,
 }
 
-type AllColumns = (karma::name, karma::score);
-pub const ALL_COLUMNS: AllColumns = (karma::name, karma::score);
-
 impl Karma {
-    fn get_by_name(conn: &DbConn, name: &str) -> Result<Option<Self>> {
-        Ok(karma::table
-            .select(ALL_COLUMNS)
-            .filter(karma::name.eq(name))
-            .first::<Karma>(conn)
-            .optional()?)
+    async fn get_by_name(conn: Arc<tokio_postgres::Client>, name: &str) -> Result<Self> {
+        let res = conn
+            .query_opt("SELECT name, score FROM karma WHERE name=$1;", &[&name])
+            .await?;
+
+        Ok(if let Some(row) = res {
+            Karma {
+                name: row.get(0),
+                score: row.get(1),
+            }
+        } else {
+            Karma {
+                name: name.to_string(),
+                score: 0,
+            }
+        })
     }
 
-    fn create_or_update(conn: &DbConn, name: &str, score: i32) -> Result<Self> {
-        Ok(diesel::insert_into(karma::table)
-            .values((karma::name.eq(name), karma::score.eq(score)))
-            .on_conflict(karma::name)
-            .do_update()
-            .set(karma::score.eq(karma::score + score))
-            .returning(ALL_COLUMNS)
-            .get_result(conn)?)
+    async fn create_or_update(
+        conn: Arc<tokio_postgres::Client>,
+        name: &str,
+        score: i32,
+    ) -> Result<Self> {
+        conn.execute(
+            "INSERT INTO karma (name, score) VALUES ($1, $2)
+ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score;",
+            &[&name, &score],
+        )
+        .await?;
+
+        Karma::get_by_name(conn, name).await
     }
 }
 
@@ -55,15 +64,9 @@ impl Plugin for KarmaPlugin {
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {
-                let inner_arg = arg.to_string();
+                let karma = Karma::get_by_name(ctx.get_db(), arg).await?;
 
-                let conn = ctx.get_db()?;
-                let karma_result =
-                    tokio::task::spawn_blocking(move || Karma::get_by_name(&conn, &inner_arg[..]))
-                        .await??
-                        .map_or(0, |k| k.score);
-
-                ctx.mention_reply(&format!("{}'s karma is {}", arg, karma_result))
+                ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
                     .await?;
             }
             Event::Privmsg(_, msg) => {
@@ -71,23 +74,16 @@ impl Plugin for KarmaPlugin {
 
                 if !captures.is_empty() {
                     for capture in captures {
-                        let name = capture[1].to_string();
+                        let name = &capture[1];
                         let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
                         if capture[2].starts_with('-') {
                             change *= -1;
                         }
 
-                        let conn = ctx.get_db()?;
-                        let karma_result = tokio::task::spawn_blocking(move || {
-                            Karma::create_or_update(&conn, &name[..], change)
-                        })
-                        .await??;
+                        let karma = Karma::create_or_update(ctx.get_db(), name, change).await?;
 
-                        ctx.reply(&format!(
-                            "{}'s karma is now {}",
-                            karma_result.name, karma_result.score
-                        ))
-                        .await?;
+                        ctx.reply(&format!("{}'s karma is now {}", karma.name, karma.score))
+                            .await?;
                     }
                 }
             }

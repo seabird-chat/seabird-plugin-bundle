@@ -12,20 +12,9 @@ use tracing::{error, field, trace, trace_span};
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
-#[cfg(feature = "db")]
-use diesel::{r2d2, PgConnection};
-
 use crate::codec::IrcCodec;
 use crate::plugins;
 use crate::prelude::*;
-
-#[cfg(feature = "db")]
-embed_migrations!("./migrations/");
-
-#[cfg(feature = "db")]
-pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
-#[cfg(feature = "db")]
-pub type DbConn = r2d2::PooledConnection<r2d2::ConnectionManager<PgConnection>>;
 
 #[derive(Debug)]
 struct ToSend {
@@ -60,7 +49,6 @@ pub struct ClientConfig {
 
     pub include_message_id_in_logs: bool,
 
-    #[cfg(feature = "db")]
     pub db_url: String,
 }
 
@@ -76,8 +64,7 @@ pub struct Client {
     plugins: Vec<Box<dyn Plugin>>,
     state: Mutex<Arc<ClientState>>,
 
-    #[cfg(feature = "db")]
-    db_pool: Arc<DbPool>,
+    db_client: Arc<tokio_postgres::Client>,
 }
 
 impl Client {
@@ -148,7 +135,7 @@ impl Client {
                 self.state.lock().await.clone(),
                 msg,
                 tx_sender.clone(),
-                self.db_pool.clone(),
+                self.db_client.clone(),
             );
 
             let message_span = if ctx.client_state.config.include_message_id_in_logs {
@@ -209,23 +196,26 @@ async fn send_startup_messages(
 }
 
 pub async fn run(config: ClientConfig) -> Result<()> {
-    let mut plugins: Vec<Box<dyn Plugin>> = vec![
+    let plugins: Vec<Box<dyn Plugin>> = vec![
         Box::new(plugins::ChancePlugin::new()),
         Box::new(plugins::NoaaPlugin::new()),
+        Box::new(plugins::KarmaPlugin::new()),
     ];
 
-    #[cfg(feature = "db")]
-    let db_pool = {
-        plugins.push(Box::new(plugins::BucketPlugin::new()));
-        plugins.push(Box::new(plugins::KarmaPlugin::new()));
+    let (mut db_client, db_connection) =
+        tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
 
-        let db_pool = DbPool::new(r2d2::ConnectionManager::new(&config.db_url[..]))?;
+    // The connection object performs the actual communication with the database,
+    // so spawn it off to run on its own.
+    tokio::spawn(async move {
+        if let Err(e) = db_connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
 
-        // Run all migrations
-        embedded_migrations::run_with_output(&db_pool.get()?, &mut std::io::stderr())?;
-
-        db_pool
-    };
+    crate::migrations::runner()
+        .run_async(&mut db_client)
+        .await?;
 
     // Step 1: Connect to the server
     let addr = config
@@ -257,8 +247,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     let client = Client {
         plugins: plugins,
         state: Mutex::new(state),
-        #[cfg(feature = "db")]
-        db_pool: Arc::new(db_pool),
+        db_client: Arc::new(db_client),
     };
 
     let send = client.writer_task(writer, rx_sender);
@@ -280,8 +269,7 @@ pub struct Context {
     sender: mpsc::Sender<ToSend>,
     client_state: Arc<ClientState>,
 
-    #[cfg(feature = "db")]
-    db_pool: Arc<DbPool>,
+    db_client: Arc<tokio_postgres::Client>,
 }
 
 impl Context {
@@ -289,15 +277,14 @@ impl Context {
         client_state: Arc<ClientState>,
         msg: irc::Message,
         sender: mpsc::Sender<ToSend>,
-        #[cfg(feature = "db")] db_pool: Arc<DbPool>,
+        db_client: Arc<tokio_postgres::Client>,
     ) -> Self {
         Context {
             client_state,
             msg,
             sender,
             id: Uuid::new_v4(),
-            #[cfg(feature = "db")]
-            db_pool,
+            db_client,
         }
     }
 
@@ -381,7 +368,7 @@ impl Context {
         Event::from_message(self.client_state.clone(), &self.msg)
     }
 
-    pub fn get_db(&self) -> Result<DbConn> {
-        Ok(self.db_pool.get()?)
+    pub fn get_db(&self) -> Arc<tokio_postgres::Client> {
+        self.db_client.clone()
     }
 }
