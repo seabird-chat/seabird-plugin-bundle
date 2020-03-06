@@ -25,6 +25,7 @@ tokio-util = { version = "0.2", features = ["codec"] }
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }
+time = "0.2"
 tokio-postgres = "0.5"
 rand = "0.7"
 

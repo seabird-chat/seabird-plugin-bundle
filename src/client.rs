@@ -171,6 +171,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         Box::new(plugins::ChancePlugin::new()),
         Box::new(plugins::NoaaPlugin::new()),
         Box::new(plugins::KarmaPlugin::new()),
+        Box::new(plugins::UptimePlugin::new()),
     ];
 
     let (mut db_client, db_connection) =
