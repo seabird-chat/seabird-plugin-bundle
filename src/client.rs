@@ -168,7 +168,6 @@ async fn send_startup_messages(
 
 pub async fn run(config: ClientConfig) -> Result<()> {
     let plugins: Vec<Box<dyn Plugin>> = vec![
-        Box::new(plugins::ChancePlugin::new()),
         Box::new(plugins::NoaaPlugin::new()),
         Box::new(plugins::KarmaPlugin::new()),
         Box::new(plugins::UptimePlugin::new()),

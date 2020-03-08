@@ -1,9 +1,6 @@
 // mod bucket;
 // pub use bucket::BucketPlugin;
 
-mod chance;
-pub use chance::ChancePlugin;
-
 mod karma;
 pub use karma::KarmaPlugin;
 
