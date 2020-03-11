@@ -9,3 +9,6 @@ pub use noaa::NoaaPlugin;
 
 mod uptime;
 pub use uptime::UptimePlugin;
+
+mod url;
+pub use url::UrlPlugin;

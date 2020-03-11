@@ -141,6 +141,7 @@ impl Client {
                 .iter()
                 .map(|p| p.handle_message(&ctx))
                 .collect();
+
             // TODO: add better context around error
             if let Err(e) = try_join_all(plugins).await {
                 error!("Plugin(s) failed to execute: {}", e);
@@ -171,6 +172,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         Box::new(plugins::NoaaPlugin::new()),
         Box::new(plugins::KarmaPlugin::new()),
         Box::new(plugins::UptimePlugin::new()),
+        Box::new(plugins::UrlPlugin::new()),
     ];
 
     let (mut db_client, db_connection) =

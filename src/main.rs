@@ -9,6 +9,18 @@ mod migrations;
 mod plugin;
 mod plugins;
 mod prelude;
+mod utils;
+
+fn spawn<T>(task: T) -> tokio::task::JoinHandle<()>
+where
+    T: std::future::Future<Output = Result<(), anyhow::Error>> + Send + 'static,
+{
+    tokio::spawn(async move {
+        if let Err(e) = task.await {
+            error!("Background task failed to execute: {}", e);
+        };
+    })
+}
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
