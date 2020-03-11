@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use time::{Duration, Instant};
+use time::Instant;
 
 use crate::prelude::*;
 
@@ -25,10 +25,8 @@ impl Plugin for UptimePlugin {
             let elapsed = self.started.elapsed();
 
             let days = elapsed.whole_days();
-            let elapsed = elapsed - Duration::days(days);
-            let hours = elapsed.whole_hours();
-            let elapsed = elapsed - Duration::hours(hours);
-            let minutes = elapsed.whole_minutes();
+            let hours = elapsed.whole_hours() - (days * 24);
+            let minutes = elapsed.whole_minutes() - (days * 24 * 60) - (hours * 60);
 
             let mut ret = String::new();
 
