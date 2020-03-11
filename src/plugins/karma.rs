@@ -69,6 +69,7 @@ impl Plugin for KarmaPlugin {
                 ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
                     .await?;
             }
+
             Event::Privmsg(_, msg) => {
                 let captures: Vec<_> = self.re.captures_iter(msg).collect();
 

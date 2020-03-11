@@ -11,10 +11,10 @@ pub struct NoaaPlugin {
 }
 
 impl NoaaPlugin {
-    pub fn new() -> Self {
-        NoaaPlugin {
+    pub fn new() -> Arc<Self> {
+        Arc::new(NoaaPlugin {
             base_url: "https://tgftp.nws.noaa.gov/data",
-        }
+        })
     }
 }
 
@@ -32,26 +32,34 @@ async fn lines_from_url(url: &str) -> Result<std::io::Lines<std::io::Cursor<Stri
 }
 
 #[async_trait]
-impl Plugin for NoaaPlugin {
+impl Plugin for Arc<NoaaPlugin> {
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("metar", Some(station)) => {
                 let mut station = station.to_string();
                 station.make_ascii_uppercase();
 
-                let mut lines = lines_from_url(&format!(
-                    "{}/observations/metar/stations/{}.TXT",
-                    self.base_url, station
-                ))
-                .await?;
-                let _ = lines.next();
-                let line = lines
-                    .next()
-                    .transpose()?
-                    .ok_or_else(|| anyhow::anyhow!("No results"))?;
+                let plugin = (*self).clone();
+                let ctx = (*ctx).clone();
 
-                ctx.mention_reply(&line[..]).await?;
+                crate::spawn(async move {
+                    let mut lines = lines_from_url(&format!(
+                        "{}/observations/metar/stations/{}.TXT",
+                        plugin.base_url, station
+                    ))
+                    .await?;
+                    let _ = lines.next();
+                    let line = lines
+                        .next()
+                        .transpose()?
+                        .ok_or_else(|| anyhow::anyhow!("No results"))?;
+
+                    ctx.mention_reply(&line[..]).await?;
+
+                    Ok(())
+                });
             }
+
             // TODO: implement stored stations
             Event::Command("metar", None) => {
                 ctx.mention_reply(&format!(
@@ -60,23 +68,31 @@ impl Plugin for NoaaPlugin {
                 ))
                 .await?;
             }
+
             Event::Command("taf", Some(station)) => {
                 let mut station = station.to_string();
                 station.make_ascii_uppercase();
 
-                let mut lines = lines_from_url(&format!(
-                    "{}/forecasts/taf/stations/{}.TXT",
-                    self.base_url, station
-                ))
-                .await?;
-                let _ = lines.next();
+                let plugin = (*self).clone();
+                let ctx = (*ctx).clone();
 
-                for line in lines {
-                    if let Ok(line) = line {
-                        ctx.mention_reply(&line.trim()).await?;
+                crate::spawn(async move {
+                    let mut lines = lines_from_url(&format!(
+                        "{}/forecasts/taf/stations/{}.TXT",
+                        plugin.base_url, station
+                    ))
+                    .await?;
+                    let _ = lines.next();
+                    for line in lines {
+                        if let Ok(line) = line {
+                            ctx.mention_reply(&line.trim()).await?;
+                        }
                     }
-                }
+
+                    Ok(())
+                });
             }
+
             // TODO: implement stored stations
             Event::Command("taf", None) => {
                 ctx.mention_reply(&format!(
