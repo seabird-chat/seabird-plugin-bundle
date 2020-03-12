@@ -4,6 +4,9 @@
 mod karma;
 pub use karma::KarmaPlugin;
 
+mod net_tools;
+pub use net_tools::NetToolsPlugin;
+
 mod noaa;
 pub use noaa::NoaaPlugin;
 

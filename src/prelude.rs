@@ -1,5 +1,7 @@
 pub use std::sync::Arc;
 
+pub use async_trait::async_trait;
+
 pub use irc::Message;
 
 pub use crate::client::{Client, ClientConfig, ClientState, Context};
