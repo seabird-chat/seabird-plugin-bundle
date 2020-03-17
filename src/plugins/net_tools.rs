@@ -15,17 +15,17 @@ fn display_rdata(rdata: RData) -> String {
         RData::A(addr) => format!("A {}", addr),
         RData::AAAA(addr) => format!("AAAA {}", addr),
         RData::ANAME(name) => format!("ANAME {}", name),
-        RData::CAA(caa) => unimplemented!(),
+        RData::CAA(_caa) => unimplemented!(),
         RData::CNAME(name) => format!("CNAME {}", name),
         RData::MX(mx) => format!("MX {} {}", mx.preference(), mx.exchange()),
-        RData::NAPTR(naptr) => unimplemented!(),
+        RData::NAPTR(_naptr) => unimplemented!(),
         RData::NULL(null) => format!(
             "NULL {}",
             String::from_utf8_lossy(null.anything().unwrap_or("".as_bytes()))
         ),
         RData::NS(name) => format!("NS {}", name),
-        RData::OPENPGPKEY(key) => unimplemented!(),
-        RData::OPT(opt) => unimplemented!(),
+        RData::OPENPGPKEY(_key) => unimplemented!(),
+        RData::OPT(_opt) => unimplemented!(),
         RData::PTR(name) => format!("PTR {}", name),
         RData::SOA(soa) => format!(
             "SOA {} {} {} {} {} {} {}",
@@ -44,8 +44,8 @@ fn display_rdata(rdata: RData) -> String {
             srv.port(),
             srv.target()
         ),
-        RData::SSHFP(sshfp) => unimplemented!(),
-        RData::TLSA(tlsa) => unimplemented!(),
+        RData::SSHFP(_sshfp) => unimplemented!(),
+        RData::TLSA(_tlsa) => unimplemented!(),
         RData::TXT(txt) => format!(
             "TXT {:?}",
             txt.txt_data()

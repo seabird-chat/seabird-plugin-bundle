@@ -1,17 +1,20 @@
 // mod bucket;
-// pub use bucket::BucketPlugin;
+// pub use self::bucket::BucketPlugin;
+
+mod forecast;
+pub use self::forecast::ForecastPlugin;
 
 mod karma;
-pub use karma::KarmaPlugin;
+pub use self::karma::KarmaPlugin;
 
 mod net_tools;
-pub use net_tools::NetToolsPlugin;
+pub use self::net_tools::NetToolsPlugin;
 
 mod noaa;
-pub use noaa::NoaaPlugin;
+pub use self::noaa::NoaaPlugin;
 
 mod uptime;
-pub use uptime::UptimePlugin;
+pub use self::uptime::UptimePlugin;
 
 mod url;
-pub use url::UrlPlugin;
+pub use self::url::UrlPlugin;

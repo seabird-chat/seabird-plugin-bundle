@@ -1,7 +1,5 @@
 use std::fmt::Write;
-use std::sync::Arc;
 
-use async_trait::async_trait;
 use time::Instant;
 
 use crate::prelude::*;

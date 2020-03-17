@@ -18,20 +18,24 @@ native-tls = "0.2"
 pin-project = "0.4"
 pretty_env_logger = "0.4"
 thiserror = "1.0"
-tokio = { version = "0.2", features = ["io-util", "macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
+tokio = { version = "0.2", features = ["io-util", "macros", "tcp", "rt-core", "rt-threaded", "blocking", "stream", "sync", "time"] }
 tokio-tls = "0.3"
 tokio-util = { version = "0.2", features = ["codec"] }
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }
 quick-xml = "0.17"
-time = "0.2"
-tokio-postgres = "0.5"
 rand = "0.7"
 regex = "1.3"
 reqwest = { version = "0.10", features = ["json", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+time = "0.2"
+tokio-postgres = "0.5"
 trust-dns-resolver = { version = "0.19", features = ["tokio-runtime"] }
 
-# In order to get refinery working with barrel, for now we need to use the
-# version from git.
+# We need this to properly convert errors coming from the geocoding package.
+failure = "0.1.3"
+
+# In order to get these packages working properly, we need to use the versions
+# from git.
 refinery = { git = "https://github.com/rust-db/refinery", features = ["tokio-postgres"] }

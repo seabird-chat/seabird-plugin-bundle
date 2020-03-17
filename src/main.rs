@@ -15,7 +15,7 @@ fn spawn<T>(task: T) -> tokio::task::JoinHandle<()>
 where
     T: std::future::Future<Output = Result<(), anyhow::Error>> + Send + 'static,
 {
-    tokio::spawn(async move {
+    tokio::task::spawn(async move {
         if let Err(e) = task.await {
             error!("Background task failed to execute: {}", e);
         };
@@ -40,6 +40,8 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NAME").ok(),
         dotenv::var("DATABASE_URL")?,
         dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or("!".to_string()),
+        dotenv::var("DARKSKY_API_KEY")?,
+        dotenv::var("GOOGLE_MAPS_API_KEY")?,
     );
 
     client::run(config.into()).await

@@ -1,6 +1,5 @@
 use std::io;
 
-use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use quick_xml::{events::Event as XmlEvent, Reader};
 use regex::Regex;

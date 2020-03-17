@@ -23,6 +23,9 @@ pub struct ClientConfig {
     pub command_prefix: String,
 
     pub db_url: String,
+
+    pub darksky_api_key: String,
+    pub maps_api_key: String,
 }
 
 impl ClientConfig {
@@ -33,6 +36,8 @@ impl ClientConfig {
         name: Option<String>,
         db_url: String,
         command_prefix: String,
+        darksky_api_key: String,
+        maps_api_key: String,
     ) -> Self {
         let user = user.unwrap_or_else(|| nick.clone());
         let name = name.unwrap_or_else(|| user.clone());
@@ -44,6 +49,8 @@ impl ClientConfig {
             name,
             db_url,
             command_prefix,
+            darksky_api_key,
+            maps_api_key,
         }
     }
 }
@@ -169,6 +176,10 @@ async fn send_startup_messages(
 
 pub async fn run(config: ClientConfig) -> Result<()> {
     let plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(plugins::ForecastPlugin::new(
+            config.darksky_api_key.clone(),
+            config.maps_api_key.clone(),
+        )),
         Box::new(plugins::KarmaPlugin::new()),
         Box::new(plugins::NetToolsPlugin::new()),
         Box::new(plugins::NoaaPlugin::new()),

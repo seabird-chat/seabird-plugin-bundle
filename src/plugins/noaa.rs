@@ -1,8 +1,5 @@
 use std::io::BufRead;
-use std::sync::Arc;
 use std::time::Instant;
-
-use async_trait::async_trait;
 
 use crate::prelude::*;
 
@@ -30,7 +27,7 @@ impl NoaaPlugin {
         .await?;
 
         // Only set the station if a request was successful.
-        StoredNoaaStation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
+        NoaaLocation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
 
         let _ = lines.next();
         let line = lines
@@ -54,7 +51,7 @@ impl NoaaPlugin {
         .await?;
 
         // Only set the station if a request was successful.
-        StoredNoaaStation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
+        NoaaLocation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
 
         let _ = lines.next();
         for line in lines {
@@ -68,17 +65,20 @@ impl NoaaPlugin {
 }
 
 #[derive(Debug)]
-pub struct StoredNoaaStation {
+pub struct NoaaLocation {
     pub nick: String,
     pub station: String,
 }
 
-impl StoredNoaaStation {
+impl NoaaLocation {
     async fn get_by_name(conn: Arc<tokio_postgres::Client>, nick: &str) -> Result<Option<Self>> {
         Ok(conn
-            .query_opt("SELECT nick, station FROM noaa WHERE nick=$1;", &[&nick])
+            .query_opt(
+                "SELECT nick, station FROM noaa_location WHERE nick=$1;",
+                &[&nick],
+            )
             .await?
-            .map(|row| StoredNoaaStation {
+            .map(|row| NoaaLocation {
                 nick: row.get(0),
                 station: row.get(1),
             }))
@@ -90,7 +90,7 @@ impl StoredNoaaStation {
         station: &str,
     ) -> Result<()> {
         conn.execute(
-            "INSERT INTO noaa (nick, station) VALUES ($1, $2)
+            "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)
 ON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
             &[&nick, &station],
         )
@@ -116,7 +116,7 @@ async fn lines_from_url(url: &str) -> Result<std::io::Lines<std::io::Cursor<Stri
 async fn extract_station(ctx: &Arc<Context>, arg: Option<&str>) -> Result<Option<String>> {
     match arg {
         Some(station) => Ok(Some(station.to_string())),
-        None => Ok(StoredNoaaStation::get_by_name(ctx.get_db(), ctx.sender()?)
+        None => Ok(NoaaLocation::get_by_name(ctx.get_db(), ctx.sender()?)
             .await?
             .map(|station| station.station)),
     }
