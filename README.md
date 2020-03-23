@@ -1,4 +1,4 @@
-# rs-seabird
+# seabird-rs
 
 ## Development
 

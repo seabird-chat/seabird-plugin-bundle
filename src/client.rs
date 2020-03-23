@@ -182,6 +182,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
             config.maps_api_key.clone(),
         )),
         Box::new(plugins::KarmaPlugin::new()),
+        Box::new(plugins::MentionPlugin::new()),
         Box::new(plugins::NetToolsPlugin::new()),
         Box::new(plugins::NoaaPlugin::new()),
         Box::new(plugins::UptimePlugin::new()),
@@ -191,8 +192,9 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     let (mut db_client, db_connection) =
         tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
 
-    // The connection object performs the actual communication with the database,
-    // so spawn it off to run on its own.
+    // The connection object performs the actual communication with the
+    // database, so spawn it off to run on its own. TODO: make sure it actually
+    // fails the bot if it exits.
     tokio::spawn(async move {
         if let Err(e) = db_connection.await {
             eprintln!("connection error: {}", e);

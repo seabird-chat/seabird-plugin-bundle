@@ -7,6 +7,9 @@ pub use self::forecast::ForecastPlugin;
 mod karma;
 pub use self::karma::KarmaPlugin;
 
+mod mention;
+pub use self::mention::MentionPlugin;
+
 mod net_tools;
 pub use self::net_tools::NetToolsPlugin;
 
