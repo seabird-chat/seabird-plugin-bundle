@@ -193,8 +193,9 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
 
     // The connection object performs the actual communication with the
-    // database, so spawn it off to run on its own. TODO: make sure it actually
-    // fails the bot if it exits.
+    // database, so spawn it off to run on its own.
+    //
+    // TODO: make sure it actually fails the bot if it exits.
     tokio::spawn(async move {
         if let Err(e) = db_connection.await {
             eprintln!("connection error: {}", e);
