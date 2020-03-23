@@ -29,6 +29,7 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         host: String,
         nick: String,
@@ -230,7 +231,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     });
 
     let client = Client {
-        plugins: plugins,
+        plugins,
         state: Mutex::new(state),
         db_client: Arc::new(db_client),
     };

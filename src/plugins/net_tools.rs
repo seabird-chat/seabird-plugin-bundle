@@ -21,7 +21,7 @@ fn display_rdata(rdata: RData) -> String {
         RData::NAPTR(_naptr) => unimplemented!(),
         RData::NULL(null) => format!(
             "NULL {}",
-            String::from_utf8_lossy(null.anything().unwrap_or("".as_bytes()))
+            String::from_utf8_lossy(null.anything().unwrap_or(b"")),
         ),
         RData::NS(name) => format!("NS {}", name),
         RData::OPENPGPKEY(_key) => unimplemented!(),
@@ -56,9 +56,9 @@ fn display_rdata(rdata: RData) -> String {
         RData::Unknown { code, rdata } => format!(
             "UNKNOWN ({}) {}",
             code,
-            String::from_utf8_lossy(rdata.anything().unwrap_or("".as_bytes()))
+            String::from_utf8_lossy(rdata.anything().unwrap_or(b"")),
         ),
-        RData::ZERO => format!("ZERO"),
+        RData::ZERO => "ZERO".to_string(),
     }
 }
 
@@ -72,7 +72,7 @@ impl Plugin for NetToolsPlugin {
                 // There are some weird ownership issues if this iterator lives
                 // too long, so we take care of pulling the data out as soon as
                 // we can.
-                let mut iter = arg.splitn(2, " ").map(String::from);
+                let mut iter = arg.splitn(2, ' ').map(String::from);
                 let arg0 = iter.next();
                 let arg1 = iter.next();
 
@@ -106,7 +106,7 @@ impl Plugin for NetToolsPlugin {
                     };
 
                     for record in records {
-                        ctx.mention_reply(&format!("{}", record)).await?;
+                        ctx.mention_reply(&record.to_string()).await?;
                     }
 
                     Ok(())
