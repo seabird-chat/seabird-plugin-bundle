@@ -36,7 +36,7 @@ impl Karma {
     ) -> Result<Self> {
         conn.execute(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
-ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score;",
+ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
             &[&name, &score],
         )
         .await?;
