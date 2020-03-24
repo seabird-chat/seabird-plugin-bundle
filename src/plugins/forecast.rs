@@ -36,7 +36,7 @@ impl ForecastPlugin {
 
         let temp_unit = match &res.flags.units[..] {
             "auto" => "°",
-            "imperial" => "°F",
+            "us" => "°F",
             _ => "°C",
         };
 
@@ -76,7 +76,7 @@ impl ForecastPlugin {
 
         let temp_unit = match &res.flags.units[..] {
             "auto" => "°",
-            "imperial" => "°F",
+            "us" => "°F",
             _ => "°C",
         };
 
