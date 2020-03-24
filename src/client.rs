@@ -115,6 +115,7 @@ impl Client {
             trace!("--> {}", message);
             writer.write_all(message.as_bytes()).await?;
             writer.write_all(b"\r\n").await?;
+            writer.flush().await?;
         }
 
         // TODO: this is actually an error - the send queue dried up.
