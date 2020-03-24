@@ -19,6 +19,7 @@ pub struct ClientConfig {
     pub nick: String,
     pub user: String,
     pub name: String,
+    pub password: Option<String>,
 
     pub command_prefix: String,
 
@@ -35,6 +36,7 @@ impl ClientConfig {
         nick: String,
         user: Option<String>,
         name: Option<String>,
+        password: Option<String>,
         db_url: String,
         command_prefix: String,
         darksky_api_key: String,
@@ -48,6 +50,7 @@ impl ClientConfig {
             nick,
             user,
             name,
+            password,
             db_url,
             command_prefix,
             darksky_api_key,
@@ -166,6 +169,10 @@ async fn send_startup_messages(
     config: &ClientConfig,
     mut tx_send: mpsc::Sender<String>,
 ) -> Result<()> {
+    if let Some(password) = &config.password {
+        tx_send.send(format!("PASS :{}", &password)).await?;
+    }
+
     tx_send.send(format!("NICK :{}", &config.nick)).await?;
     tx_send
         .send(format!(

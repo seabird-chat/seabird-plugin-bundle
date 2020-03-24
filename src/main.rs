@@ -38,6 +38,7 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_NICK")?,
         dotenv::var("SEABIRD_USER").ok(),
         dotenv::var("SEABIRD_NAME").ok(),
+        dotenv::var("SEABIRD_PASS").ok(),
         dotenv::var("DATABASE_URL")?,
         dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or_else(|_| "!".to_string()),
         dotenv::var("DARKSKY_API_KEY")?,
