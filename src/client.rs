@@ -80,6 +80,8 @@ impl Client {
             Event::RplWelcome(client, _) => {
                 info!("Connected!");
 
+                ctx.send("JOIN", vec!["#main"]).await?;
+                ctx.send("JOIN", vec!["#encoded"]).await?;
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
 
                 // Copy what the server called us.
