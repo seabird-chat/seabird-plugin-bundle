@@ -16,7 +16,7 @@ RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird /
 
 # Create a new base and copy in only what we need.
 FROM debian:buster-slim
-COPY --from=builder /usr/local/cargo/bin/seabird /usr/local/bin/seabird
 ENV RUST_LOG=info
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /usr/local/bin/seabird /usr/local/bin/seabird
 CMD ["seabird"]

@@ -11,6 +11,10 @@ pub struct Karma {
 }
 
 impl Karma {
+    fn sanitize_name(name: &str) -> String {
+        name.to_lowercase()
+    }
+
     async fn get_by_name(conn: Arc<tokio_postgres::Client>, name: &str) -> Result<Self> {
         let res = conn
             .query_opt("SELECT name, score FROM karma WHERE name=$1;", &[&name])
@@ -41,7 +45,7 @@ ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
         )
         .await?;
 
-        Karma::get_by_name(conn, name).await
+        Karma::get_by_name(conn, &name).await
     }
 }
 
@@ -62,7 +66,8 @@ impl Plugin for KarmaPlugin {
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {
-                let karma = Karma::get_by_name(ctx.get_db(), arg).await?;
+                let name = Karma::sanitize_name(arg);
+                let karma = Karma::get_by_name(ctx.get_db(), &name).await?;
 
                 ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
                     .await?;
@@ -79,9 +84,11 @@ impl Plugin for KarmaPlugin {
                             change *= -1;
                         }
 
-                        let karma = Karma::create_or_update(ctx.get_db(), name, change).await?;
+                        let cleaned_name = Karma::sanitize_name(name);
+                        let karma =
+                            Karma::create_or_update(ctx.get_db(), &cleaned_name, change).await?;
 
-                        ctx.reply(&format!("{}'s karma is now {}", karma.name, karma.score))
+                        ctx.reply(&format!("{}'s karma is now {}", name, karma.score))
                             .await?;
                     }
                 }
