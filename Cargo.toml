@@ -18,9 +18,8 @@ native-tls = "0.2"
 pin-project = "0.4"
 pretty_env_logger = "0.4"
 thiserror = "1.0"
-tokio = { version = "0.2", features = ["io-util", "macros", "tcp", "rt-core", "rt-threaded", "blocking", "stream", "sync", "time"] }
+tokio = { version = "0.2", features = ["macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
 tokio-tls = "0.3"
-tokio-util = { version = "0.2", features = ["codec"] }
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }

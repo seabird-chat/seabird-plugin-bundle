@@ -2,7 +2,6 @@
 extern crate log;
 
 mod client;
-mod codec;
 mod error;
 mod event;
 mod migrations;

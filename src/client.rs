@@ -3,13 +3,11 @@ use std::sync::Arc;
 
 use futures::future::try_join_all;
 use native_tls::TlsConnector;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::{mpsc, Mutex};
-use tokio_util::codec::FramedRead;
 
-use crate::codec::IrcCodec;
 use crate::plugins;
 use crate::prelude::*;
 
@@ -126,10 +124,11 @@ impl Client {
     where
         R: AsyncRead + Unpin,
     {
-        // Read all messages as irc::Messages.
-        let mut framed = FramedRead::new(reader, IrcCodec::new());
+        let mut stream = BufReader::new(reader).lines();
 
-        while let Some(msg) = framed.next().await.transpose()? {
+        while let Some(line) = stream.next().await.transpose()? {
+            let msg: irc::Message = line.parse()?;
+
             let mut ctx = Context::new(
                 self.state.lock().await.clone(),
                 msg,
