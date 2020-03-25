@@ -1,12 +1,10 @@
 use std::io;
 
-use futures::stream::TryStreamExt;
+use futures::{AsyncReadExt, TryStreamExt};
 use quick_xml::{events::Event as XmlEvent, Reader};
 use regex::Regex;
-use tokio::io::AsyncReadExt;
 
 use crate::prelude::*;
-use crate::utils::StreamReader;
 
 pub struct UrlPlugin {
     re: Regex,
@@ -40,14 +38,14 @@ impl Plugin for Arc<UrlPlugin> {
 
             crate::spawn(async move {
                 for url in urls {
-                    let body = reqwest::get(&url)
-                        .await?
-                        .bytes_stream()
-                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e));
+                    let mut buf = String::new();
 
                     // Read in at most 4k of data
-                    let mut buf = String::new();
-                    StreamReader::new(body)
+                    reqwest::get(&url)
+                        .await?
+                        .bytes_stream()
+                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+                        .into_async_read()
                         .take(4096)
                         .read_to_string(&mut buf)
                         .await?;

@@ -1,5 +1,6 @@
+// API clients
 pub mod darksky;
 pub mod maps;
 
-mod stream_reader;
-pub use stream_reader::StreamReader;
+pub mod hex_slice;
+pub use hex_slice::HexSlice;

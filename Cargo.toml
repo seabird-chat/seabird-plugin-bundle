@@ -31,7 +31,7 @@ reqwest = { version = "0.10", features = ["json", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 time = "0.2"
 tokio-postgres = "0.5"
-trust-dns-resolver = { version = "0.19", features = ["tokio-runtime"] }
+trust-dns-resolver = { git = "https://github.com/belak/trust-dns", branch = "caa-as-str", version = "0.19", features = ["tokio-runtime"] }
 
 # In order to get these packages working properly, we need to use the versions
 # from git.

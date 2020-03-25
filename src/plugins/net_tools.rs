@@ -1,6 +1,13 @@
-use crate::prelude::*;
+use std::borrow::Cow;
+use std::fmt::Write;
 
-use trust_dns_resolver::{proto::rr::RData, proto::xfer::DnsRequestOptions, AsyncResolver};
+use crate::prelude::*;
+use crate::utils::HexSlice;
+
+use trust_dns_resolver::{
+    proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData, proto::xfer::DnsRequestOptions,
+    AsyncResolver,
+};
 
 pub struct NetToolsPlugin {}
 
@@ -15,7 +22,30 @@ fn display_rdata(rdata: RData) -> String {
         RData::A(addr) => format!("A {}", addr),
         RData::AAAA(addr) => format!("AAAA {}", addr),
         RData::ANAME(name) => format!("ANAME {}", name),
-        RData::CAA(_caa) => unimplemented!(),
+        RData::CAA(caa) => format!(
+            "CAA {} {} {}",
+            if caa.issuer_critical() { 1 } else { 0 },
+            caa.tag().as_str(),
+            match caa.value() {
+                CAAValue::Issuer(name, kv) => {
+                    // Note that we use unwrap here because the implementation
+                    // of fmt::Write on String will always return Ok(())
+                    let mut buf = String::new();
+                    if let Some(name) = name {
+                        write!(buf, "{}", name).unwrap();
+                        if !kv.is_empty() {
+                            buf.write_char(' ').unwrap();
+                        }
+                    }
+                    if !kv.is_empty() {
+                        write!(buf, "{:?}", kv).unwrap();
+                    }
+                    Cow::Owned(buf)
+                }
+                CAAValue::Url(url) => Cow::Owned(url.to_string()),
+                CAAValue::Unknown(data) => String::from_utf8_lossy(data),
+            },
+        ),
         RData::CNAME(name) => format!("CNAME {}", name),
         RData::MX(mx) => format!("MX {} {}", mx.preference(), mx.exchange()),
         RData::NAPTR(_naptr) => unimplemented!(),
@@ -44,7 +74,16 @@ fn display_rdata(rdata: RData) -> String {
             srv.port(),
             srv.target()
         ),
-        RData::SSHFP(_sshfp) => unimplemented!(),
+        RData::SSHFP(sshfp) => {
+            let algorithm: u8 = sshfp.algorithm().into();
+            let fingerprint_type: u8 = sshfp.fingerprint_type().into();
+            format!(
+                "SSHFP {} {} {}",
+                algorithm,
+                fingerprint_type,
+                HexSlice::new(sshfp.fingerprint()),
+            )
+        }
         RData::TLSA(_tlsa) => unimplemented!(),
         RData::TXT(txt) => format!(
             "TXT {:?}",
