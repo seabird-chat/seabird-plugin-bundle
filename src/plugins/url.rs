@@ -1,7 +1,6 @@
 use std::io;
 
 use futures::{AsyncReadExt, TryStreamExt};
-use quick_xml::{events::Event as XmlEvent, Reader};
 use regex::Regex;
 
 use crate::prelude::*;
@@ -9,6 +8,7 @@ use crate::prelude::*;
 pub struct UrlPlugin {
     re: Regex,
     newline_re: Regex,
+    title_selector: scraper::Selector,
 }
 
 impl UrlPlugin {
@@ -16,7 +16,23 @@ impl UrlPlugin {
         Arc::new(UrlPlugin {
             re: Regex::new(r#"https?://[^ ]*[^ ?]+"#).unwrap(),
             newline_re: Regex::new(r#"\s*\n\s*"#).unwrap(),
+            title_selector: scraper::Selector::parse("title").unwrap(),
         })
+    }
+}
+
+impl UrlPlugin {
+    fn parse_title(self: &Arc<Self>, buf: &str) -> Option<String> {
+        let html = scraper::Html::parse_fragment(buf);
+
+        let mut titles = html.select(&self.title_selector);
+        if let Some(title_element) = titles.next() {
+            if let Some(title) = title_element.text().next() {
+                return Some(self.newline_re.replace_all(&title, " ").into_owned());
+            }
+        }
+
+        None
     }
 }
 
@@ -33,58 +49,32 @@ impl Plugin for Arc<UrlPlugin> {
         };
 
         if !urls.is_empty() {
-            let ctx = (*ctx).clone();
-            let plugin = (*self).clone();
+            for url_str in urls {
+                let ctx = (*ctx).clone();
+                let plugin = (*self).clone();
 
-            crate::spawn(async move {
-                for url in urls {
+                crate::spawn(async move {
                     let mut buf = String::new();
 
+                    let parsed_url = url::Url::parse(&url_str)?;
+
                     // Read in at most 4k of data
-                    reqwest::get(&url)
+                    reqwest::get(parsed_url)
                         .await?
                         .bytes_stream()
                         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
                         .into_async_read()
-                        .take(4096)
+                        .take(1024 * 1024)
                         .read_to_string(&mut buf)
                         .await?;
 
-                    let mut xml_buf = Vec::new();
-                    let mut reader = Reader::from_str(&buf[..]);
-                    reader.trim_text(true);
-
-                    loop {
-                        match reader.read_event(&mut xml_buf)? {
-                            XmlEvent::Start(ref e) if e.name() == b"title" => {
-                                let mut text_buf = Vec::new();
-                                let title_buf = reader.read_text(e.name(), &mut text_buf)?;
-                                let title = plugin.newline_re.replace_all(&title_buf, " ");
-                                ctx.reply(&format!("Title: {}", title.trim())).await?;
-                                return Ok(());
-                            }
-
-                            // We actually want to ignore most event types.
-                            XmlEvent::DocType(_)
-                            | XmlEvent::PI(_)
-                            | XmlEvent::Comment(_)
-                            | XmlEvent::CData(_)
-                            | XmlEvent::Decl(_)
-                            | XmlEvent::Start(_)
-                            | XmlEvent::End(_)
-                            | XmlEvent::Empty(_)
-                            | XmlEvent::Text(_) => {}
-
-                            XmlEvent::Eof => {
-                                warn!("Failed to get title for {}", url);
-                                break;
-                            }
-                        };
+                    if let Some(title) = plugin.parse_title(&buf) {
+                        ctx.reply(&format!("Title: {}", title.trim())).await?;
                     }
-                }
 
-                Ok(())
-            });
+                    Ok(())
+                });
+            }
         }
 
         Ok(())
