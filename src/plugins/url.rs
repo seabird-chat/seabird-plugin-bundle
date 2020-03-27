@@ -6,15 +6,18 @@ use regex::Regex;
 use crate::prelude::*;
 
 pub struct UrlPlugin {
-    re: Regex,
+    link_finder: linkify::LinkFinder,
     newline_re: Regex,
     title_selector: scraper::Selector,
 }
 
 impl UrlPlugin {
     pub fn new() -> Arc<Self> {
+        let mut link_finder = linkify::LinkFinder::new();
+        link_finder.kinds(&[linkify::LinkKind::Url]);
+
         Arc::new(UrlPlugin {
-            re: Regex::new(r#"https?://[^ ]*[^ ?]+"#).unwrap(),
+            link_finder,
             newline_re: Regex::new(r#"\s*\n\s*"#).unwrap(),
             title_selector: scraper::Selector::parse("title").unwrap(),
         })
@@ -40,9 +43,9 @@ impl UrlPlugin {
 impl Plugin for Arc<UrlPlugin> {
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
-            self.re
-                .captures_iter(msg)
-                .map(|c| String::from(&c[0]))
+            self.link_finder
+                .links(msg)
+                .map(|link| link.as_str().to_string())
                 .collect()
         } else {
             Vec::new()
