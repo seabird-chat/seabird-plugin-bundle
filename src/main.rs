@@ -1,4 +1,4 @@
-#![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![warn(missing_debug_implementations, rust_2018_idioms)]
 
 #[macro_use]
 extern crate log;
@@ -30,7 +30,7 @@ async fn main() -> error::Result<()> {
 
     // There's a little bit of an oddity here, since we want to set it if it
     // hasn't already been set, but we want this done before the logger is loaded.
-    if let Err(_) = std::env::var("RUST_LOG") {
+    if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info,seabird=debug");
     }
 
