@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::BTreeSet;
 
 use async_trait::async_trait;
 use maplit::btreeset;
@@ -51,6 +52,18 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
         if !supported_plugins.contains(&plugin_name[..]) {
             warn!("Tried to disable unknown plugin {}", plugin_name);
         }
+    }
+
+    // Check that plugins are only present in one of the lists
+    let enabled_set = config.enabled_plugins.iter().cloned().collect::<BTreeSet<_>>();
+    let disabled_set = config.disabled_plugins.iter().cloned().collect::<BTreeSet<_>>();
+    let intersection: Vec<_> = enabled_set.intersection(&disabled_set).cloned().collect();
+    if !intersection.is_empty() {
+        anyhow::bail!(
+            "{} plugin(s) marked as both enabled and disabled: {}",
+            intersection.len(),
+            intersection.join(", "),
+        );
     }
 
     // For all the plugins we know, try to enable them.
