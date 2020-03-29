@@ -1,17 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
-use anyhow::format_err;
 use futures::future::try_join_all;
-use maplit::btreeset;
 use native_tls::TlsConnector;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::{mpsc, Mutex};
 
-use crate::plugins;
 use crate::prelude::*;
 
 #[derive(Clone)]
@@ -24,7 +21,8 @@ pub struct ClientConfig {
 
     pub command_prefix: String,
 
-    pub enabled_plugins: Vec<String>,
+    pub enabled_plugins: BTreeSet<String>,
+    pub disabled_plugins: BTreeSet<String>,
 
     pub db_url: String,
 
@@ -42,7 +40,8 @@ impl ClientConfig {
         password: Option<String>,
         db_url: String,
         command_prefix: String,
-        enabled_plugins: Vec<String>,
+        enabled_plugins: BTreeSet<String>,
+        disabled_plugins: BTreeSet<String>,
         darksky_api_key: Option<String>,
         maps_api_key: Option<String>,
     ) -> Self {
@@ -58,9 +57,29 @@ impl ClientConfig {
             db_url,
             command_prefix,
             enabled_plugins,
+            disabled_plugins,
             darksky_api_key,
             maps_api_key,
         }
+    }
+}
+
+impl ClientConfig {
+    /// If enabled_plugins is not specified or is empty, all plugins are allowed
+    /// to be loaded, otherwise only specified plugins will be loaded.
+    ///
+    /// Any plugins in disabled_plugins which were otherwise enabled, will be
+    /// skipped.
+    ///
+    /// Note that this function does not check for plugin validity, only if it
+    /// would be enabled based on the name.
+    pub fn plugin_enabled(&self, plugin_name: &str) -> bool {
+        if self.disabled_plugins.contains(plugin_name) {
+            return false;
+        }
+
+        // If enabled_plugins has no values, all are enabled.
+        self.enabled_plugins.is_empty() || self.enabled_plugins.contains(plugin_name)
     }
 }
 
@@ -73,7 +92,7 @@ pub struct ClientState {
 
 // Client represents the running bot.
 pub struct Client {
-    plugins: Vec<Option<Box<dyn Plugin>>>,
+    plugins: Vec<Box<dyn Plugin>>,
     state: Mutex<Arc<ClientState>>,
 
     db_client: Arc<tokio_postgres::Client>,
@@ -158,9 +177,7 @@ impl Client {
 
             let mut futures = Vec::new();
             for plugin in self.plugins.iter() {
-                if let Some(plugin) = plugin {
-                    futures.push(plugin.handle_message(&ctx));
-                }
+                futures.push(plugin.handle_message(&ctx));
             }
 
             // TODO: add better context around error
@@ -192,115 +209,8 @@ async fn send_startup_messages(
     Ok(())
 }
 
-#[derive(PartialEq, Eq)]
-enum PluginState {
-    Enabled,
-    Disabled,
-}
-
-/// Validates the plugins given in the bot's environment
-/// and builds a map of plugin_name -> plugin_state for
-/// use later.
-fn validate_plugin_config(config: &ClientConfig) -> Result<BTreeMap<String, PluginState>> {
-    let supported_plugins = btreeset![
-        "forecast".to_string(),
-        "karma".to_string(),
-        "mention".to_string(),
-        "net_tools".to_string(),
-        "noaa".to_string(),
-        "uptime".to_string(),
-        "url".to_string()
-    ];
-    let enabled_plugins: BTreeSet<_> = config.enabled_plugins.iter().collect();
-
-    // Check that all of the provided plugins are supported
-    let mut unknown_plugins = Vec::new();
-    for plugin_name in enabled_plugins.iter() {
-        if !supported_plugins.contains(&plugin_name.to_string()) {
-            unknown_plugins.push(plugin_name.to_string());
-        }
-    }
-
-    if !unknown_plugins.is_empty() {
-        return Err(format_err!(
-            "{} plugin(s) not supported: {}",
-            unknown_plugins.len(),
-            unknown_plugins.join(", ")
-        ));
-    }
-
-    // Set plugin states for each valid plugin
-    let mut plugin_states = BTreeMap::new();
-    for plugin_name in supported_plugins.iter() {
-        plugin_states.insert(
-            plugin_name.to_string(),
-            if enabled_plugins.contains(plugin_name) {
-                PluginState::Enabled
-            } else {
-                PluginState::Disabled
-            },
-        );
-    }
-
-    Ok(plugin_states)
-}
-
-/// Convenience function to wrap getting the state
-/// for a specific plugin. Here to avoid more boilerplate.
-fn plugin_state<'a>(
-    states: &'a BTreeMap<String, PluginState>,
-    plugin_name: &str,
-) -> Result<&'a PluginState> {
-    states
-        .get(plugin_name)
-        .ok_or_else(|| format_err!("{} plugin not found", plugin_name))
-}
-
 pub async fn run(config: ClientConfig) -> Result<()> {
-    let plugin_states = validate_plugin_config(&config)?;
-
-    // Here we optionally instantiate all supported plugins.
-    //
-    // Plugins are only instantiated if the user has added
-    // them to the $SEABIRD_ENABLED_PLUGINS environment
-    // variable.
-    let plugins: Vec<Option<Box<dyn Plugin>>> = vec![
-        match plugin_state(&plugin_states, "forecast")? {
-            PluginState::Enabled => Some(Box::new(plugins::ForecastPlugin::new(
-                config.darksky_api_key.clone().ok_or_else(|| format_err!(
-                    "Missing $DARKSKY_API_KEY. Required by the enabled \"forecast\" plugin."
-                ))?,
-                config.maps_api_key.clone().ok_or_else(|| format_err!(
-                    "Missing $MAPS_API_KEY. Required by the enabled \"forecast\" plugin."
-                ))?,
-            ))),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "karma")? {
-            PluginState::Enabled => Some(Box::new(plugins::KarmaPlugin::new())),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "mention")? {
-            PluginState::Enabled => Some(Box::new(plugins::MentionPlugin::new())),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "net_tools")? {
-            PluginState::Enabled => Some(Box::new(plugins::NetToolsPlugin::new())),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "noaa")? {
-            PluginState::Enabled => Some(Box::new(plugins::NoaaPlugin::new())),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "uptime")? {
-            PluginState::Enabled => Some(Box::new(plugins::UptimePlugin::new())),
-            PluginState::Disabled => None,
-        },
-        match plugin_state(&plugin_states, "url")? {
-            PluginState::Enabled => Some(Box::new(plugins::UrlPlugin::new())),
-            PluginState::Disabled => None,
-        },
-    ];
+    let plugins = crate::plugin::load(&config)?;
 
     let (mut db_client, db_connection) =
         tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
