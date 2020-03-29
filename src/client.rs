@@ -324,7 +324,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         .target
         .to_socket_addrs()?
         .next()
-        .ok_or_else(|| anyhow::anyhow!("Failed to look up address"))?;
+        .ok_or_else(|| format_err!("Failed to look up address"))?;
 
     let socket = TcpStream::connect(&addr).await?;
     let cx = TlsConnector::builder()
@@ -400,13 +400,11 @@ impl Context {
                         .msg
                         .prefix
                         .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                        .ok_or_else(|| format_err!("Prefix missing"))?
                         .nick[..]
                 },
             ),
-            _ => Err(anyhow::anyhow!(
-                "Tried to find a target for an invalid message"
-            )),
+            _ => Err(format_err!("Tried to find a target for an invalid message")),
         }
     }
 
@@ -417,11 +415,9 @@ impl Context {
                 .msg
                 .prefix
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                .ok_or_else(|| format_err!("Prefix missing"))?
                 .nick[..]),
-            _ => Err(anyhow::anyhow!(
-                "Tried to find a sender for an invalid message"
-            )),
+            _ => Err(format_err!("Tried to find a sender for an invalid message")),
         }
     }
 

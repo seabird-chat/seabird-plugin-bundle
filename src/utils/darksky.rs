@@ -65,12 +65,12 @@ impl TryFrom<DarkskyResponse> for Forecast {
         Ok(Forecast {
             data: resp
                 .daily
-                .ok_or_else(|| anyhow::anyhow!("Missing daily"))?
+                .ok_or_else(|| format_err!("Missing daily"))?
                 .data
                 .into_iter()
                 .map(|data_point| data_point.try_into())
                 .collect::<Result<Vec<Weather>>>()?,
-            flags: resp.flags.ok_or_else(|| anyhow::anyhow!("Missing flags"))?,
+            flags: resp.flags.ok_or_else(|| format_err!("Missing flags"))?,
         })
     }
 }
@@ -95,37 +95,37 @@ impl TryFrom<DarkskyResponse> for CurrentWeather {
     fn try_from(resp: DarkskyResponse) -> Result<CurrentWeather> {
         let current = resp
             .currently
-            .ok_or_else(|| anyhow::anyhow!("Missing current"))?;
+            .ok_or_else(|| format_err!("Missing current"))?;
 
-        let today = resp.daily.ok_or_else(|| anyhow::anyhow!("Missing daily"))?;
+        let today = resp.daily.ok_or_else(|| format_err!("Missing daily"))?;
 
         let today = today
             .data
             .into_iter()
             .next()
-            .ok_or_else(|| anyhow::anyhow!("Missing day 0"))?;
+            .ok_or_else(|| format_err!("Missing day 0"))?;
 
         Ok(CurrentWeather {
             data: CurrentWeatherData {
                 time: time::OffsetDateTime::from_unix_timestamp(today.time),
                 temperature: current
                     .temperature
-                    .ok_or_else(|| anyhow::anyhow!("Missing temperature"))?,
+                    .ok_or_else(|| format_err!("Missing temperature"))?,
                 temperature_high: today
                     .temperature_high
-                    .ok_or_else(|| anyhow::anyhow!("Missing temperature_high"))?,
+                    .ok_or_else(|| format_err!("Missing temperature_high"))?,
                 temperature_low: today
                     .temperature_low
-                    .ok_or_else(|| anyhow::anyhow!("Missing temperature_low"))?,
+                    .ok_or_else(|| format_err!("Missing temperature_low"))?,
                 humidity: today
                     .humidity
-                    .ok_or_else(|| anyhow::anyhow!("Missing humidity"))?
+                    .ok_or_else(|| format_err!("Missing humidity"))?
                     * 100.0,
                 summary: today
                     .summary
-                    .ok_or_else(|| anyhow::anyhow!("Missing summary"))?,
+                    .ok_or_else(|| format_err!("Missing summary"))?,
             },
-            flags: resp.flags.ok_or_else(|| anyhow::anyhow!("Missing flags"))?,
+            flags: resp.flags.ok_or_else(|| format_err!("Missing flags"))?,
         })
     }
 }
@@ -146,17 +146,17 @@ impl TryFrom<DataPoint> for Weather {
             time: time::OffsetDateTime::from_unix_timestamp(data_point.time),
             temperature_high: data_point
                 .temperature_high
-                .ok_or_else(|| anyhow::anyhow!("Missing temperature_high"))?,
+                .ok_or_else(|| format_err!("Missing temperature_high"))?,
             temperature_low: data_point
                 .temperature_low
-                .ok_or_else(|| anyhow::anyhow!("Missing temperature_low"))?,
+                .ok_or_else(|| format_err!("Missing temperature_low"))?,
             humidity: data_point
                 .humidity
-                .ok_or_else(|| anyhow::anyhow!("Missing humidity"))?
+                .ok_or_else(|| format_err!("Missing humidity"))?
                 * 100.0,
             summary: data_point
                 .summary
-                .ok_or_else(|| anyhow::anyhow!("Missing summary"))?,
+                .ok_or_else(|| format_err!("Missing summary"))?,
         })
     }
 }

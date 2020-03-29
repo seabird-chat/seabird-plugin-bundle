@@ -113,9 +113,9 @@ impl ForecastPlugin {
 
                 let mut iter = results.into_iter();
                 let loc = match (iter.next(), iter.next()) {
-                    (None, _) => Err(anyhow::anyhow!("No location results found")),
+                    (None, _) => Err(format_err!("No location results found")),
                     (Some(loc), None) => Ok(loc),
-                    (Some(_), Some(_)) => Err(anyhow::anyhow!("More than one location result")),
+                    (Some(_), Some(_)) => Err(format_err!("More than one location result")),
                 }?;
 
                 Ok(Some(ForecastLocation::new(

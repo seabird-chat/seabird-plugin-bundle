@@ -29,10 +29,10 @@ impl Plugin for UptimePlugin {
             let mut ret = String::new();
 
             if days > 0 {
-                write!(ret, "{} days ", days)?;
+                write!(ret, "{} days ", days).unwrap();
             }
 
-            write!(ret, "{:02}:{:02}", hours, minutes)?;
+            write!(ret, "{:02}:{:02}", hours, minutes).unwrap();
 
             ctx.mention_reply(&ret[..]).await?;
         }
