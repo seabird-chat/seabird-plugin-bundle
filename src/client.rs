@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
@@ -8,7 +9,6 @@ use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio::sync::{mpsc, Mutex};
 
-use crate::plugins;
 use crate::prelude::*;
 
 #[derive(Clone)]
@@ -21,10 +21,13 @@ pub struct ClientConfig {
 
     pub command_prefix: String,
 
+    pub enabled_plugins: BTreeSet<String>,
+    pub disabled_plugins: BTreeSet<String>,
+
     pub db_url: String,
 
-    pub darksky_api_key: String,
-    pub maps_api_key: String,
+    pub darksky_api_key: Option<String>,
+    pub maps_api_key: Option<String>,
 }
 
 impl ClientConfig {
@@ -37,8 +40,10 @@ impl ClientConfig {
         password: Option<String>,
         db_url: String,
         command_prefix: String,
-        darksky_api_key: String,
-        maps_api_key: String,
+        enabled_plugins: BTreeSet<String>,
+        disabled_plugins: BTreeSet<String>,
+        darksky_api_key: Option<String>,
+        maps_api_key: Option<String>,
     ) -> Self {
         let user = user.unwrap_or_else(|| nick.clone());
         let name = name.unwrap_or_else(|| user.clone());
@@ -51,9 +56,30 @@ impl ClientConfig {
             password,
             db_url,
             command_prefix,
+            enabled_plugins,
+            disabled_plugins,
             darksky_api_key,
             maps_api_key,
         }
+    }
+}
+
+impl ClientConfig {
+    /// If enabled_plugins is not specified or is empty, all plugins are allowed
+    /// to be loaded, otherwise only specified plugins will be loaded.
+    ///
+    /// Any plugins in disabled_plugins which were otherwise enabled, will be
+    /// skipped.
+    ///
+    /// Note that this function does not check for plugin validity, only if it
+    /// would be enabled based on the name.
+    pub fn plugin_enabled(&self, plugin_name: &str) -> bool {
+        if self.disabled_plugins.contains(plugin_name) {
+            return false;
+        }
+
+        // If enabled_plugins has no values, all are enabled.
+        self.enabled_plugins.is_empty() || self.enabled_plugins.contains(plugin_name)
     }
 }
 
@@ -149,14 +175,13 @@ impl Client {
             // plugins.
             let ctx = Arc::new(ctx);
 
-            let plugins: Vec<_> = self
-                .plugins
-                .iter()
-                .map(|p| p.handle_message(&ctx))
-                .collect();
+            let mut futures = Vec::new();
+            for plugin in self.plugins.iter() {
+                futures.push(plugin.handle_message(&ctx));
+            }
 
             // TODO: add better context around error
-            if let Err(e) = try_join_all(plugins).await {
+            if let Err(e) = try_join_all(futures).await {
                 error!("Plugin(s) failed to execute: {}", e);
             }
         }
@@ -185,18 +210,7 @@ async fn send_startup_messages(
 }
 
 pub async fn run(config: ClientConfig) -> Result<()> {
-    let plugins: Vec<Box<dyn Plugin>> = vec![
-        Box::new(plugins::ForecastPlugin::new(
-            config.darksky_api_key.clone(),
-            config.maps_api_key.clone(),
-        )),
-        Box::new(plugins::KarmaPlugin::new()),
-        Box::new(plugins::MentionPlugin::new()),
-        Box::new(plugins::NetToolsPlugin::new()),
-        Box::new(plugins::NoaaPlugin::new()),
-        Box::new(plugins::UptimePlugin::new()),
-        Box::new(plugins::UrlPlugin::new()),
-    ];
+    let plugins = crate::plugin::load(&config)?;
 
     let (mut db_client, db_connection) =
         tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
@@ -220,7 +234,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         .target
         .to_socket_addrs()?
         .next()
-        .ok_or_else(|| anyhow::anyhow!("Failed to look up address"))?;
+        .ok_or_else(|| format_err!("Failed to look up address"))?;
 
     let socket = TcpStream::connect(&addr).await?;
     let cx = TlsConnector::builder()
@@ -296,13 +310,11 @@ impl Context {
                         .msg
                         .prefix
                         .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                        .ok_or_else(|| format_err!("Prefix missing"))?
                         .nick[..]
                 },
             ),
-            _ => Err(anyhow::anyhow!(
-                "Tried to find a target for an invalid message"
-            )),
+            _ => Err(format_err!("Tried to find a target for an invalid message")),
         }
     }
 
@@ -313,11 +325,9 @@ impl Context {
                 .msg
                 .prefix
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Prefix missing"))?
+                .ok_or_else(|| format_err!("Prefix missing"))?
                 .nick[..]),
-            _ => Err(anyhow::anyhow!(
-                "Tried to find a sender for an invalid message"
-            )),
+            _ => Err(format_err!("Tried to find a sender for an invalid message")),
         }
     }
 

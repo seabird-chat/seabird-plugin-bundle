@@ -1,5 +1,7 @@
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
+use anyhow::Context;
+
 #[macro_use]
 extern crate log;
 
@@ -45,15 +47,28 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = client::ClientConfig::new(
-        dotenv::var("SEABIRD_HOST")?,
-        dotenv::var("SEABIRD_NICK")?,
+        dotenv::var("SEABIRD_HOST")
+            .context("Missing $SEABIRD_HOST. You must specify a host for the bot to connect to.")?,
+        dotenv::var("SEABIRD_NICK")
+            .context("Missing $SEABIRD_NICK. You must specify a nickname for the bot.")?,
         dotenv::var("SEABIRD_USER").ok(),
         dotenv::var("SEABIRD_NAME").ok(),
         dotenv::var("SEABIRD_PASS").ok(),
-        dotenv::var("DATABASE_URL")?,
+        dotenv::var("DATABASE_URL")
+            .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
         dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or_else(|_| "!".to_string()),
-        dotenv::var("DARKSKY_API_KEY")?,
-        dotenv::var("GOOGLE_MAPS_API_KEY")?,
+        dotenv::var("SEABIRD_ENABLED_PLUGINS")
+            .unwrap_or_else(|_| "".to_string())
+            .split_terminator(",")
+            .map(|s| s.to_string())
+            .collect(),
+        dotenv::var("SEABIRD_DISABLED_PLUGINS")
+            .unwrap_or_else(|_| "".to_string())
+            .split_terminator(",")
+            .map(|s| s.to_string())
+            .collect(),
+        dotenv::var("DARKSKY_API_KEY").ok(),
+        dotenv::var("GOOGLE_MAPS_API_KEY").ok(),
     );
 
     client::run(config).await

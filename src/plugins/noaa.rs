@@ -33,7 +33,7 @@ impl NoaaPlugin {
         let line = lines
             .next()
             .transpose()?
-            .ok_or_else(|| anyhow::anyhow!("No results"))?;
+            .ok_or_else(|| format_err!("No results"))?;
 
         ctx.mention_reply(&line[..]).await?;
 
