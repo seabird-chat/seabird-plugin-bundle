@@ -78,7 +78,13 @@ impl Plugin for KarmaPlugin {
 
                 if !captures.is_empty() {
                     for capture in captures {
-                        let name = &capture[1];
+                        let mut name = &capture[1];
+
+                        // TODO: switch to strip_prefix and strip_suffix when they're available.
+                        if name.starts_with('"') && name.ends_with('"') {
+                            name = &name[1..name.len() - 1];
+                        }
+
                         let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
                         if capture[2].starts_with('-') {
                             change *= -1;
