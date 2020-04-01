@@ -110,6 +110,7 @@ impl Client {
                 ctx.send("JOIN", vec!["#main"]).await?;
                 ctx.send("JOIN", vec!["#encoded"]).await?;
                 ctx.send("JOIN", vec!["#encoded-test"]).await?;
+                ctx.send("JOIN", vec!["#minecraft"]).await?;
 
                 // Copy what the server called us.
                 let mut guard = self.state.lock().await;
