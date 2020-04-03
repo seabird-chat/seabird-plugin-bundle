@@ -36,7 +36,7 @@ impl Karma {
     async fn create_or_update(
         conn: Arc<tokio_postgres::Client>,
         name: &str,
-        score: i32,
+        score: i64,
     ) -> Result<Self> {
         conn.execute(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
@@ -85,7 +85,9 @@ impl Plugin for KarmaPlugin {
                             name = &name[1..name.len() - 1];
                         }
 
-                        let mut change: i32 = (&capture[2].len() - 1).try_into().unwrap();
+                        // Len returns a usize which won't fit in an i64, so we need to try and
+                        // convert it.
+                        let mut change: i64 = (&capture[2].len() - 1).try_into()?;
                         if capture[2].starts_with('-') {
                             change *= -1;
                         }
