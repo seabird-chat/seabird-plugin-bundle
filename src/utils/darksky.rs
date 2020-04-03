@@ -31,6 +31,7 @@ impl Client {
             ])
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 
@@ -46,6 +47,7 @@ impl Client {
             .query(&[("units", "auto"), ("exclude", "hourly,minutely,alerts")])
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 

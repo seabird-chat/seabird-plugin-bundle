@@ -8,26 +8,79 @@ pub struct ForecastPlugin {
 }
 
 impl ForecastPlugin {
-    pub fn new(darksky_api_key: String, maps_api_key: String) -> Arc<Self> {
-        Arc::new(ForecastPlugin {
+    pub fn new(darksky_api_key: String, maps_api_key: String) -> Self {
+        ForecastPlugin {
             darksky: darksky::Client::new(darksky_api_key),
             maps: maps::Client::new(maps_api_key),
-        })
+        }
     }
 }
 
 impl ForecastPlugin {
-    async fn lookup_weather(
-        self: Arc<Self>,
-        ctx: Arc<Context>,
-        location: ForecastLocation,
-    ) -> Result<()> {
+    async fn handle_weather(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
+        match self.extract_location(ctx, arg).await? {
+            LocationStatus::SingleLocation(location) => {
+                self.lookup_weather(ctx, location).await?;
+            }
+            LocationStatus::MultipleLocations(locations) => {
+                ctx.mention_reply(&format!(
+                    "Multiple possible locations. {}.",
+                    locations
+                        .into_iter()
+                        .take(5)
+                        .map(|loc| loc.address)
+                        .join(", "),
+                ))
+                .await?;
+            }
+            LocationStatus::NoLocations => {
+                ctx.mention_reply(&format!(
+                    "Missing location argument or unknown location. Usage: {}weather <station>",
+                    ctx.command_prefix()
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_forecast(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
+        match self.extract_location(ctx, arg).await? {
+            LocationStatus::SingleLocation(location) => {
+                self.lookup_forecast(ctx, location).await?;
+            }
+            LocationStatus::MultipleLocations(locations) => {
+                ctx.mention_reply(&format!(
+                    "Multiple possible locations. {}.",
+                    locations
+                        .into_iter()
+                        .take(5)
+                        .map(|loc| loc.address)
+                        .join(", "),
+                ))
+                .await?;
+            }
+            LocationStatus::NoLocations => {
+                ctx.mention_reply(&format!(
+                    "Missing location argument or unknown location. Usage: {}forecast <station>",
+                    ctx.command_prefix()
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn lookup_weather(&self, ctx: &Context, location: ForecastLocation) -> Result<()> {
         let res = self.darksky.weather(location.lat, location.lng).await?;
 
         // Only set the station if a request was successful.
         ForecastLocation::set_for_name(
             ctx.get_db(),
-            ctx.sender()?,
+            ctx.sender()
+                .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &location.address[..],
             location.lat,
             location.lng,
@@ -57,17 +110,14 @@ impl ForecastPlugin {
         Ok(())
     }
 
-    async fn lookup_forecast(
-        self: Arc<Self>,
-        ctx: Arc<Context>,
-        location: ForecastLocation,
-    ) -> Result<()> {
+    async fn lookup_forecast(&self, ctx: &Context, location: ForecastLocation) -> Result<()> {
         let res = self.darksky.forecast(location.lat, location.lng).await?;
 
         // Only set the station if a request was successful.
         ForecastLocation::set_for_name(
             ctx.get_db(),
-            ctx.sender()?,
+            ctx.sender()
+                .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &location.address[..],
             location.lat,
             location.lng,
@@ -102,32 +152,51 @@ impl ForecastPlugin {
         Ok(())
     }
 
-    async fn extract_location(
-        self: &Arc<Self>,
-        ctx: &Arc<Context>,
-        arg: Option<&str>,
-    ) -> Result<Option<ForecastLocation>> {
+    async fn extract_location(&self, ctx: &Context, arg: Option<&str>) -> Result<LocationStatus> {
+        let sender = ctx
+            .sender()
+            .ok_or_else(|| format_err!("couldn't extract location: event missing sender"))?;
+
         match arg {
             Some(address) => {
                 let results = self.maps.forward(address).await?;
-
-                let mut iter = results.into_iter();
-                let loc = match (iter.next(), iter.next()) {
-                    (None, _) => Err(format_err!("No location results found")),
-                    (Some(loc), None) => Ok(loc),
-                    (Some(_), Some(_)) => Err(format_err!("More than one location result")),
-                }?;
-
-                Ok(Some(ForecastLocation::new(
-                    ctx.sender()?.to_string(),
-                    address.to_string(),
-                    loc.lat,
-                    loc.lng,
-                )))
+                Ok(match results.len() {
+                    0 => LocationStatus::NoLocations,
+                    1 => LocationStatus::SingleLocation(ForecastLocation::new(
+                        sender.to_string(),
+                        address.to_string(),
+                        results[0].lat,
+                        results[0].lng,
+                    )),
+                    _ => LocationStatus::MultipleLocations(
+                        results
+                            .into_iter()
+                            .map(|loc| {
+                                ForecastLocation::new(
+                                    sender.to_string(),
+                                    loc.display_name,
+                                    loc.lat,
+                                    loc.lng,
+                                )
+                            })
+                            .collect(),
+                    ),
+                })
             }
-            None => Ok(ForecastLocation::get_by_name(ctx.get_db(), ctx.sender()?).await?),
+            None => Ok(ForecastLocation::get_by_name(ctx.get_db(), sender)
+                .await?
+                .map_or(LocationStatus::NoLocations, |loc| {
+                    LocationStatus::SingleLocation(loc)
+                })),
         }
     }
+}
+
+#[derive(Debug)]
+enum LocationStatus {
+    NoLocations,
+    MultipleLocations(Vec<ForecastLocation>),
+    SingleLocation(ForecastLocation),
 }
 
 #[derive(Debug)]
@@ -183,7 +252,7 @@ UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
 }
 
 #[async_trait]
-impl Plugin for Arc<ForecastPlugin> {
+impl Plugin for ForecastPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(ForecastPlugin::new(
             dotenv::var("DARKSKY_API_KEY").map_err(|_| {
@@ -197,43 +266,17 @@ impl Plugin for Arc<ForecastPlugin> {
         ))
     }
 
-    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
-        match ctx.as_event() {
-            Event::Command("weather", arg) => match self.extract_location(ctx, arg).await? {
-                Some(location) => {
-                    let plugin = (*self).clone();
-                    let ctx = (*ctx).clone();
+    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(ctx) = stream.next().await {
+            let res = match ctx.as_event() {
+                Event::Command("weather", arg) => self.handle_weather(&ctx, arg).await,
+                Event::Command("forecast", arg) => self.handle_forecast(&ctx, arg).await,
+                _ => Ok(()),
+            };
 
-                    crate::spawn(plugin.lookup_weather(ctx, location));
-                }
-                None => {
-                    ctx.mention_reply(&format!(
-                        "Missing location argument. Usage: {}weather <station>",
-                        ctx.command_prefix()
-                    ))
-                    .await?;
-                }
-            },
-
-            Event::Command("forecast", arg) => match self.extract_location(ctx, arg).await? {
-                Some(location) => {
-                    let plugin = (*self).clone();
-                    let ctx = (*ctx).clone();
-
-                    crate::spawn(plugin.lookup_forecast(ctx, location));
-                }
-                None => {
-                    ctx.mention_reply(&format!(
-                        "Missing location argument. Usage: {}forecast <station>",
-                        ctx.command_prefix()
-                    ))
-                    .await?;
-                }
-            },
-
-            _ => {}
+            crate::check_err(&ctx, res).await;
         }
 
-        Ok(())
+        Err(format_err!("forecast plugin exited early"))
     }
 }

@@ -12,20 +12,20 @@ pub struct UrlPlugin {
 }
 
 impl UrlPlugin {
-    pub fn new() -> Arc<Self> {
+    pub fn new() -> Self {
         let mut link_finder = linkify::LinkFinder::new();
         link_finder.kinds(&[linkify::LinkKind::Url]);
 
-        Arc::new(UrlPlugin {
+        UrlPlugin {
             link_finder,
             newline_re: Regex::new(r#"\s*\n\s*"#).unwrap(),
             title_selector: scraper::Selector::parse("title").unwrap(),
-        })
+        }
     }
 }
 
 impl UrlPlugin {
-    fn parse_title(self: &Arc<Self>, buf: &str) -> Option<String> {
+    fn parse_title(&self, buf: &str) -> Option<String> {
         let html = scraper::Html::parse_fragment(buf);
 
         let mut titles = html.select(&self.title_selector);
@@ -39,51 +39,55 @@ impl UrlPlugin {
     }
 }
 
+impl UrlPlugin {
+    async fn lookup_url_title(&self, ctx: &Context, arg: &str) -> Result<()> {
+        let parsed_url = url::Url::parse(&arg)?;
+
+        let mut buf = String::new();
+
+        // Read in at most 1M of data
+        reqwest::get(parsed_url)
+            .await?
+            .bytes_stream()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            .into_async_read()
+            .take(1024 * 1024)
+            .read_to_string(&mut buf)
+            .await?;
+
+        if let Some(title) = self.parse_title(&buf) {
+            ctx.reply(&format!("Title: {}", title.trim())).await?;
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
-impl Plugin for Arc<UrlPlugin> {
+impl Plugin for UrlPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(UrlPlugin::new())
     }
 
-    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
-        let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
-            self.link_finder
-                .links(msg)
-                .map(|link| link.as_str().to_string())
-                .collect()
-        } else {
-            Vec::new()
-        };
+    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(ctx) = stream.next().await {
+            let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
+                self.link_finder.links(msg).collect()
+            } else {
+                Vec::new()
+            };
 
-        if !urls.is_empty() {
-            for url_str in urls {
-                let ctx = (*ctx).clone();
-                let plugin = (*self).clone();
+            if !urls.is_empty() {
+                let res = futures::future::try_join_all(
+                    urls.into_iter()
+                        .map(|url| self.lookup_url_title(&ctx, url.as_str())),
+                )
+                .await;
 
-                crate::spawn(async move {
-                    let mut buf = String::new();
-
-                    let parsed_url = url::Url::parse(&url_str)?;
-
-                    // Read in at most 4k of data
-                    reqwest::get(parsed_url)
-                        .await?
-                        .bytes_stream()
-                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-                        .into_async_read()
-                        .take(1024 * 1024)
-                        .read_to_string(&mut buf)
-                        .await?;
-
-                    if let Some(title) = plugin.parse_title(&buf) {
-                        ctx.reply(&format!("Title: {}", title.trim())).await?;
-                    }
-
-                    Ok(())
-                });
+                crate::check_err(&ctx, res).await;
             }
         }
 
-        Ok(())
+        Err(format_err!("url plugin exited early"))
     }
 }

@@ -1,29 +1,41 @@
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
-use async_trait::async_trait;
 use maplit::btreeset;
+use tokio::sync::mpsc;
 
-use crate::client::{ClientConfig, Context};
-use crate::error::Result;
+use crate::prelude::*;
+
 use crate::plugins;
 
+const PLUGIN_MESSAGE_BUF: usize = 100;
+
 #[async_trait]
-pub trait Plugin: Sync + Send {
+pub trait Plugin {
     fn new_from_env() -> Result<Self>
     where
         Self: Sized;
 
-    async fn handle_connect(&self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn handle_message(&self, _ctx: &Arc<Context>) -> Result<()> {
-        Ok(())
-    }
+    async fn run(self, stream: Receiver<Arc<Context>>) -> Result<()>;
 }
 
-pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
+// TODO: this should be a struct type rather than a tuple, but it's so much more
+// convenient to just unzip it on the other end for now.
+type PluginMeta = (
+    tokio::sync::mpsc::Sender<Arc<Context>>,
+    tokio::task::JoinHandle<Result<()>>,
+);
+
+fn start_plugin<P>() -> Result<PluginMeta>
+where
+    P: Plugin + Send + 'static,
+{
+    let (sender, receiver) = mpsc::channel(PLUGIN_MESSAGE_BUF);
+    let plugin = P::new_from_env()?;
+    let handle = tokio::task::spawn(async move { plugin.run(receiver).await });
+    Ok((sender, handle))
+}
+
+pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
     let supported_plugins = btreeset![
         "forecast",
         "karma",
@@ -80,40 +92,40 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
     }
 
     // For all the plugins we know, try to enable them.
-    let mut ret: Vec<Box<dyn Plugin>> = Vec::new();
+    let mut ret = Vec::new();
 
     // Here we optionally instantiate all supported plugins.
 
     if config.plugin_enabled("forecast") {
-        ret.push(Box::new(Arc::<plugins::ForecastPlugin>::new_from_env()?));
+        ret.push(start_plugin::<plugins::ForecastPlugin>()?);
     }
 
     if config.plugin_enabled("karma") {
-        ret.push(Box::new(plugins::KarmaPlugin::new_from_env()?));
+        ret.push(start_plugin::<plugins::KarmaPlugin>()?);
     }
 
     if config.plugin_enabled("minecraft") {
-        ret.push(Box::new(plugins::MinecraftPlugin::new_from_env()?));
+        ret.push(start_plugin::<plugins::MinecraftPlugin>()?);
     }
 
     if config.plugin_enabled("mention") {
-        ret.push(Box::new(plugins::MentionPlugin::new_from_env()?));
+        ret.push(start_plugin::<plugins::MentionPlugin>()?);
     }
 
     if config.plugin_enabled("net_tools") {
-        ret.push(Box::new(plugins::NetToolsPlugin::new_from_env()?));
+        ret.push(start_plugin::<plugins::NetToolsPlugin>()?);
     }
 
     if config.plugin_enabled("noaa") {
-        ret.push(Box::new(Arc::<plugins::NoaaPlugin>::new_from_env()?));
+        ret.push(start_plugin::<plugins::NoaaPlugin>()?);
     }
 
     if config.plugin_enabled("uptime") {
-        ret.push(Box::new(plugins::UptimePlugin::new_from_env()?));
+        ret.push(start_plugin::<plugins::UptimePlugin>()?);
     }
 
     if config.plugin_enabled("url") {
-        ret.push(Box::new(Arc::<plugins::UrlPlugin>::new_from_env()?));
+        ret.push(start_plugin::<plugins::UrlPlugin>()?);
     }
 
     Ok(ret)

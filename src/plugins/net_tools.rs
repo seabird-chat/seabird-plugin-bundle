@@ -95,64 +95,68 @@ fn display_rdata(rdata: RData) -> String {
     }
 }
 
+impl NetToolsPlugin {
+    async fn handle_dig(&self, ctx: &Context, arg: &str) -> Result<()> {
+        let resolver = AsyncResolver::tokio_from_system_conf().await?;
+
+        // There seems to be a bug in Rust where it can't infer the proper
+        // lifetime, so we just convert everything to owned values to avoid
+        // worrying about it.
+        let mut iter = arg.splitn(2, ' ').map(String::from);
+        let arg0 = iter.next();
+        let arg1 = iter.next();
+
+        let records: Vec<_> = match (arg0, arg1) {
+            // If a record_type was provided, we need to try and
+            // convert it.
+            (Some(record_type), Some(name)) => resolver
+                .lookup(name, record_type.parse()?, DnsRequestOptions::default())
+                .await?
+                .into_iter()
+                .map(display_rdata)
+                .collect(),
+
+            // If they didn't provide a lookup type, default to A/AAAA
+            // records.
+            (Some(name), None) => resolver
+                .lookup_ip(name)
+                .await?
+                .iter()
+                .map(|ip| ip.to_string())
+                .collect(),
+
+            // It should be impossible to get no results from this
+            // iterator as even the empty string will have that as the
+            // first result.
+            (None, None) => unreachable!(),
+            (None, Some(_)) => unreachable!(),
+        };
+
+        for record in records {
+            ctx.mention_reply(&record.to_string()).await?;
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl Plugin for NetToolsPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(NetToolsPlugin {})
     }
 
-    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
-        match ctx.as_event() {
-            Event::Command("dig", Some(arg)) => {
-                let ctx = (*ctx).clone();
+    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(ctx) = stream.next().await {
+            let res = match ctx.as_event() {
+                Event::Command("dig", Some(arg)) => self.handle_dig(&ctx, arg).await,
+                Event::Command("dig", None) => Err(anyhow::format_err!("Not enough arguments")),
+                _ => Ok(()),
+            };
 
-                // There are some weird ownership issues if this iterator lives
-                // too long, so we take care of pulling the data out as soon as
-                // we can.
-                let mut iter = arg.splitn(2, ' ').map(String::from);
-                let arg0 = iter.next();
-                let arg1 = iter.next();
-
-                crate::spawn(async move {
-                    let resolver = AsyncResolver::tokio_from_system_conf().await?;
-
-                    let records: Vec<_> = match (arg0, arg1) {
-                        // If a record_type was provided, we need to try and
-                        // convert it.
-                        (Some(record_type), Some(name)) => resolver
-                            .lookup(name, record_type.parse()?, DnsRequestOptions::default())
-                            .await?
-                            .into_iter()
-                            .map(display_rdata)
-                            .collect(),
-
-                        // If they didn't provide a lookup type, default to A/AAAA
-                        // records.
-                        (Some(name), None) => resolver
-                            .lookup_ip(name)
-                            .await?
-                            .iter()
-                            .map(|ip| ip.to_string())
-                            .collect(),
-
-                        // It should be impossible to get no results from this
-                        // iterator as even the empty string will have that as the
-                        // first result.
-                        (None, None) => unreachable!(),
-                        (None, Some(_)) => unreachable!(),
-                    };
-
-                    for record in records {
-                        ctx.mention_reply(&record.to_string()).await?;
-                    }
-
-                    Ok(())
-                });
-            }
-            Event::Command("dig", None) => ctx.mention_reply("Not enough arguments").await?,
-            _ => {}
+            crate::check_err(&ctx, res).await;
         }
 
-        Ok(())
+        Err(format_err!("net_tools plugin exited early"))
     }
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
-use futures::future::try_join_all;
+use futures::future::{try_join_all, TryFutureExt};
 use native_tls::TlsConnector;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::prelude::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ClientConfig {
     pub target: String,
     pub nick: String,
@@ -78,6 +78,7 @@ impl ClientConfig {
 
 // ClientState represents the internal state of the client at any given point in
 // time.
+#[derive(Debug)]
 pub struct ClientState {
     pub current_nick: String,
     pub config: Arc<ClientConfig>,
@@ -85,7 +86,7 @@ pub struct ClientState {
 
 // Client represents the running bot.
 pub struct Client {
-    plugins: Vec<Box<dyn Plugin>>,
+    plugin_senders: Mutex<Vec<mpsc::Sender<Arc<Context>>>>,
     state: Mutex<Arc<ClientState>>,
 
     db_client: Arc<tokio_postgres::Client>,
@@ -137,7 +138,7 @@ impl Client {
         }
 
         // TODO: this is actually an error - the send queue dried up.
-        Ok(())
+        Err(format_err!("writer_task exited early"))
     }
 
     async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<String>) -> Result<()>
@@ -169,18 +170,12 @@ impl Client {
             // plugins.
             let ctx = Arc::new(ctx);
 
-            let mut futures = Vec::new();
-            for plugin in self.plugins.iter() {
-                futures.push(plugin.handle_message(&ctx));
-            }
-
-            // TODO: add better context around error
-            if let Err(e) = try_join_all(futures).await {
-                error!("Plugin(s) failed to execute: {}", e);
+            for plugin in self.plugin_senders.lock().await.iter_mut() {
+                plugin.send(ctx.clone()).await?;
             }
         }
 
-        Ok(())
+        Err(format_err!("reader_task exited early"))
     }
 }
 
@@ -204,8 +199,6 @@ async fn send_startup_messages(
 }
 
 pub async fn run(config: ClientConfig) -> Result<()> {
-    let plugins = crate::plugin::load(&config)?;
-
     let (mut db_client, db_connection) =
         tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
 
@@ -215,13 +208,16 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     // TODO: make sure it actually fails the bot if it exits.
     tokio::spawn(async move {
         if let Err(e) = db_connection.await {
-            eprintln!("connection error: {}", e);
+            panic!("connection error: {}", e);
         }
     });
 
     crate::migrations::runner()
         .run_async(&mut db_client)
         .await?;
+
+    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) =
+        crate::plugin::load(&config)?.into_iter().unzip();
 
     // Step 1: Connect to the server
     let addr = config
@@ -251,7 +247,7 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     });
 
     let client = Client {
-        plugins,
+        plugin_senders: Mutex::new(plugin_senders),
         state: Mutex::new(state),
         db_client: Arc::new(db_client),
     };
@@ -259,15 +255,18 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     let send = client.writer_task(writer, rx_sender);
     let read = client.reader_task(reader, tx_sender);
 
-    let (send, read) = tokio::join!(send, read);
+    let (_send, _read, plugins) =
+        tokio::try_join!(send, read, try_join_all(plugin_tasks).map_err(|e| e.into()))?;
 
-    send?;
-    read?;
+    // Ensure no plugins exited
+    for plugin in plugins {
+        plugin?;
+    }
 
     Ok(())
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Context {
     pub msg: irc::Message,
 
@@ -292,42 +291,36 @@ impl Context {
         }
     }
 
-    pub async fn reply_target(&self) -> Result<&str> {
+    pub fn reply_target(&self) -> Option<&str> {
         match (&self.msg.command[..], self.msg.params.len()) {
             // If the first param is not the current nick, we need to respond to
             // the target, otherwise the prefix's nick.
-            ("PRIVMSG", 2) => Ok(
+            ("PRIVMSG", 2) => {
                 if self.msg.params[0] != self.client_state.current_nick[..] {
-                    &self.msg.params[0][..]
+                    Some(&self.msg.params[0][..])
                 } else {
-                    &self
-                        .msg
-                        .prefix
-                        .as_ref()
-                        .ok_or_else(|| format_err!("Prefix missing"))?
-                        .nick[..]
-                },
-            ),
-            _ => Err(format_err!("Tried to find a target for an invalid message")),
+                    self.msg.prefix.as_ref().map(|p| &p.nick[..])
+                }
+            }
+            _ => None,
         }
     }
 
-    pub fn sender(&self) -> Result<&str> {
+    pub fn sender(&self) -> Option<&str> {
         match (&self.msg.command[..], self.msg.params.len()) {
             // Only return the prefix if it came from a valid message.
-            ("PRIVMSG", 2) => Ok(&self
-                .msg
-                .prefix
-                .as_ref()
-                .ok_or_else(|| format_err!("Prefix missing"))?
-                .nick[..]),
-            _ => Err(format_err!("Tried to find a sender for an invalid message")),
+            ("PRIVMSG", 2) => self.msg.prefix.as_ref().map(|p| &p.nick[..]),
+            _ => None,
         }
     }
 
     pub async fn mention_reply(&self, msg: &str) -> Result<()> {
-        let sender = self.sender()?;
-        let target = self.reply_target().await?;
+        let sender = self
+            .sender()
+            .ok_or_else(|| format_err!("Tried to get the sender of an event without one"))?;
+        let target = self
+            .reply_target()
+            .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?;
 
         // If the target matches the sender, it's a privmsg so we shouldn't send
         // a prefix.
@@ -340,8 +333,15 @@ impl Context {
     }
 
     pub async fn reply(&self, msg: &str) -> Result<()> {
-        self.send("PRIVMSG", vec![self.reply_target().await?, msg])
-            .await
+        self.send(
+            "PRIVMSG",
+            vec![
+                self.reply_target()
+                    .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?,
+                msg,
+            ],
+        )
+        .await
     }
 
     pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {

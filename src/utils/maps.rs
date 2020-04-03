@@ -26,44 +26,50 @@ impl Client {
             .query(&[("key", &self.api_key[..]), ("address", loc)])
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 
-        Ok(response
-            .results
-            .into_iter()
-            .map(|result| Location {
-                display_name: result.formatted_address,
-                lat: result.geometry.location.lat,
-                lng: result.geometry.location.lng,
-            })
-            .collect())
+        match response.status.as_ref() {
+            "OK" | "ZERO_RESULTS" => Ok(response
+                .results
+                .into_iter()
+                .map(|result| Location {
+                    display_name: result.formatted_address,
+                    lat: result.geometry.location.lat,
+                    lng: result.geometry.location.lng,
+                })
+                .collect()),
+            status => Err(format_err!("unexpected response status: {}", status)),
+        }
     }
 }
 
+#[derive(Debug)]
 pub struct Location {
     pub display_name: String,
     pub lat: f64,
     pub lng: f64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct GeocodeResponse {
     results: Vec<GeocodeResponseResult>,
+    status: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct GeocodeResponseResult {
     formatted_address: String,
     geometry: Geometry,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Geometry {
     location: GeometryLocation,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct GeometryLocation {
     lat: f64,
     lng: f64,
