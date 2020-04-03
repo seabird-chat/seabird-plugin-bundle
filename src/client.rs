@@ -25,9 +25,6 @@ pub struct ClientConfig {
     pub disabled_plugins: BTreeSet<String>,
 
     pub db_url: String,
-
-    pub darksky_api_key: Option<String>,
-    pub maps_api_key: Option<String>,
 }
 
 impl ClientConfig {
@@ -42,8 +39,6 @@ impl ClientConfig {
         command_prefix: String,
         enabled_plugins: BTreeSet<String>,
         disabled_plugins: BTreeSet<String>,
-        darksky_api_key: Option<String>,
-        maps_api_key: Option<String>,
     ) -> Self {
         let user = user.unwrap_or_else(|| nick.clone());
         let name = name.unwrap_or_else(|| user.clone());
@@ -58,8 +53,6 @@ impl ClientConfig {
             command_prefix,
             enabled_plugins,
             disabled_plugins,
-            darksky_api_key,
-            maps_api_key,
         }
     }
 }

@@ -67,8 +67,6 @@ async fn main() -> error::Result<()> {
             .split_terminator(",")
             .map(|s| s.to_string())
             .collect(),
-        dotenv::var("DARKSKY_API_KEY").ok(),
-        dotenv::var("GOOGLE_MAPS_API_KEY").ok(),
     );
 
     client::run(config).await

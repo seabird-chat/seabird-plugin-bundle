@@ -184,6 +184,19 @@ UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
 
 #[async_trait]
 impl Plugin for Arc<ForecastPlugin> {
+    fn new_from_env() -> Result<Self> {
+        Ok(ForecastPlugin::new(
+            dotenv::var("DARKSKY_API_KEY").map_err(|_| {
+                anyhow::format_err!(
+                    "Missing $DARKSKY_API_KEY. Required by the \"forecast\" plugin."
+                )
+            })?,
+            dotenv::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
+                anyhow::format_err!("Missing $MAPS_API_KEY. Required by the \"forecast\" plugin.")
+            })?,
+        ))
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("weather", arg) => match self.extract_location(ctx, arg).await? {

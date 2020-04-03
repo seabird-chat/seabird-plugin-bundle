@@ -18,6 +18,10 @@ impl UptimePlugin {
 
 #[async_trait]
 impl Plugin for UptimePlugin {
+    fn new_from_env() -> Result<Self> {
+        Ok(UptimePlugin::new())
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         if let Event::Command("uptime", _) = ctx.as_event() {
             let elapsed = self.started.elapsed();

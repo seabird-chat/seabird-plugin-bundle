@@ -9,13 +9,7 @@ use trust_dns_resolver::{
     AsyncResolver,
 };
 
-pub struct NetToolsPlugin {}
-
-impl NetToolsPlugin {
-    pub fn new() -> Self {
-        NetToolsPlugin {}
-    }
-}
+pub struct NetToolsPlugin;
 
 fn display_rdata(rdata: RData) -> String {
     match rdata {
@@ -103,6 +97,10 @@ fn display_rdata(rdata: RData) -> String {
 
 #[async_trait]
 impl Plugin for NetToolsPlugin {
+    fn new_from_env() -> Result<Self> {
+        Ok(NetToolsPlugin {})
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("dig", Some(arg)) => {

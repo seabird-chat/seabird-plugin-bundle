@@ -41,6 +41,10 @@ impl UrlPlugin {
 
 #[async_trait]
 impl Plugin for Arc<UrlPlugin> {
+    fn new_from_env() -> Result<Self> {
+        Ok(UrlPlugin::new())
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
             self.link_finder

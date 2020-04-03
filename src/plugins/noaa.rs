@@ -124,6 +124,10 @@ async fn extract_station(ctx: &Arc<Context>, arg: Option<&str>) -> Result<Option
 
 #[async_trait]
 impl Plugin for Arc<NoaaPlugin> {
+    fn new_from_env() -> Result<Self> {
+        Ok(NoaaPlugin::new())
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("metar", arg) => match extract_station(ctx, arg).await? {

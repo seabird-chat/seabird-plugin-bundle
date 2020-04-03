@@ -1,15 +1,13 @@
 use crate::prelude::*;
 
-pub struct MentionPlugin {}
-
-impl MentionPlugin {
-    pub fn new() -> Self {
-        MentionPlugin {}
-    }
-}
+pub struct MentionPlugin;
 
 #[async_trait]
 impl Plugin for MentionPlugin {
+    fn new_from_env() -> Result<Self> {
+        Ok(MentionPlugin {})
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         if let Event::Mention(msg) = ctx.as_event() {
             match msg {

@@ -63,6 +63,10 @@ impl KarmaPlugin {
 
 #[async_trait]
 impl Plugin for KarmaPlugin {
+    fn new_from_env() -> Result<Self> {
+        Ok(KarmaPlugin::new())
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("karma", Some(arg)) => {

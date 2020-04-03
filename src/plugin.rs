@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use maplit::btreeset;
@@ -10,6 +10,10 @@ use crate::plugins;
 
 #[async_trait]
 pub trait Plugin: Sync + Send {
+    fn new_from_env() -> Result<Self>
+    where
+        Self: Sized;
+
     async fn handle_connect(&self) -> Result<()> {
         Ok(())
     }
@@ -55,8 +59,16 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
     }
 
     // Check that plugins are only present in one of the lists
-    let enabled_set = config.enabled_plugins.iter().cloned().collect::<BTreeSet<_>>();
-    let disabled_set = config.disabled_plugins.iter().cloned().collect::<BTreeSet<_>>();
+    let enabled_set = config
+        .enabled_plugins
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let disabled_set = config
+        .disabled_plugins
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
     let intersection: Vec<_> = enabled_set.intersection(&disabled_set).cloned().collect();
     if !intersection.is_empty() {
         anyhow::bail!(
@@ -72,40 +84,31 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
     // Here we optionally instantiate all supported plugins.
 
     if config.plugin_enabled("forecast") {
-        ret.push(Box::new(plugins::ForecastPlugin::new(
-            config.darksky_api_key.clone().ok_or_else(|| {
-                anyhow::format_err!(
-                    "Missing $DARKSKY_API_KEY. Required by the \"forecast\" plugin."
-                )
-            })?,
-            config.maps_api_key.clone().ok_or_else(|| {
-                anyhow::format_err!("Missing $MAPS_API_KEY. Required by the \"forecast\" plugin.")
-            })?,
-        )));
+        ret.push(Box::new(Arc::<plugins::ForecastPlugin>::new_from_env()?));
     }
 
     if config.plugin_enabled("karma") {
-        ret.push(Box::new(plugins::KarmaPlugin::new()));
+        ret.push(Box::new(plugins::KarmaPlugin::new_from_env()?));
     }
 
     if config.plugin_enabled("mention") {
-        ret.push(Box::new(plugins::MentionPlugin::new()));
+        ret.push(Box::new(plugins::MentionPlugin::new_from_env()?));
     }
 
     if config.plugin_enabled("net_tools") {
-        ret.push(Box::new(plugins::NetToolsPlugin::new()));
+        ret.push(Box::new(plugins::NetToolsPlugin::new_from_env()?));
     }
 
     if config.plugin_enabled("noaa") {
-        ret.push(Box::new(plugins::NoaaPlugin::new()));
+        ret.push(Box::new(Arc::<plugins::NoaaPlugin>::new_from_env()?));
     }
 
     if config.plugin_enabled("uptime") {
-        ret.push(Box::new(plugins::UptimePlugin::new()));
+        ret.push(Box::new(plugins::UptimePlugin::new_from_env()?));
     }
 
     if config.plugin_enabled("url") {
-        ret.push(Box::new(plugins::UrlPlugin::new()));
+        ret.push(Box::new(Arc::<plugins::UrlPlugin>::new_from_env()?));
     }
 
     Ok(ret)
