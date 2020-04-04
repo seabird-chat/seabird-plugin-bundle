@@ -21,3 +21,6 @@ pub use self::uptime::UptimePlugin;
 
 mod url;
 pub use self::url::UrlPlugin;
+
+mod minecraft;
+pub use self::minecraft::MinecraftPlugin;
