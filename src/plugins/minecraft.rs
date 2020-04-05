@@ -2,7 +2,7 @@ use async_minecraft_ping::Server;
 
 use crate::prelude::*;
 
-pub struct MinecraftPlugin {}
+pub struct MinecraftPlugin;
 
 impl MinecraftPlugin {
     pub fn new() -> Self {
