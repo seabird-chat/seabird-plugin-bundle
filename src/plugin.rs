@@ -93,7 +93,7 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
     }
 
     if config.plugin_enabled("minecraft") {
-        ret.push(Box::new(plugins::MinecraftPlugin::new()));
+        ret.push(Box::new(plugins::MinecraftPlugin::new_from_env()?));
     }
 
     if config.plugin_enabled("mention") {

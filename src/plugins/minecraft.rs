@@ -4,14 +4,12 @@ use crate::prelude::*;
 
 pub struct MinecraftPlugin;
 
-impl MinecraftPlugin {
-    pub fn new() -> Self {
-        MinecraftPlugin {}
-    }
-}
-
 #[async_trait]
 impl Plugin for MinecraftPlugin {
+    fn new_from_env() -> Result<Self> {
+        Ok(MinecraftPlugin {})
+    }
+
     async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
         match ctx.as_event() {
             Event::Command("mc_players", Some(arg)) => {
