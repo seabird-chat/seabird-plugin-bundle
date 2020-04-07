@@ -10,6 +10,9 @@ pub use self::karma::KarmaPlugin;
 mod mention;
 pub use self::mention::MentionPlugin;
 
+mod minecraft;
+pub use self::minecraft::MinecraftPlugin;
+
 mod net_tools;
 pub use self::net_tools::NetToolsPlugin;
 

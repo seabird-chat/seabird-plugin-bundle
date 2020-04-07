@@ -28,6 +28,7 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
         "forecast",
         "karma",
         "mention",
+        "minecraft",
         "net_tools",
         "noaa",
         "uptime",
@@ -89,6 +90,10 @@ pub fn load(config: &ClientConfig) -> Result<Vec<Box<dyn Plugin>>> {
 
     if config.plugin_enabled("karma") {
         ret.push(Box::new(plugins::KarmaPlugin::new_from_env()?));
+    }
+
+    if config.plugin_enabled("minecraft") {
+        ret.push(Box::new(plugins::MinecraftPlugin::new()));
     }
 
     if config.plugin_enabled("mention") {
