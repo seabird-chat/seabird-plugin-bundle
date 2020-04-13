@@ -8,15 +8,15 @@ pub struct NoaaPlugin {
 }
 
 impl NoaaPlugin {
-    pub fn new() -> Arc<Self> {
-        Arc::new(NoaaPlugin {
+    pub fn new() -> Self {
+        NoaaPlugin {
             base_url: "https://tgftp.nws.noaa.gov/data",
-        })
+        }
     }
 }
 
 impl NoaaPlugin {
-    async fn lookup_metar(self: Arc<Self>, ctx: Arc<Context>, station: String) -> Result<()> {
+    async fn lookup_metar(&self, ctx: &Context, station: String) -> Result<()> {
         let mut station = station;
         station.make_ascii_uppercase();
 
@@ -27,7 +27,13 @@ impl NoaaPlugin {
         .await?;
 
         // Only set the station if a request was successful.
-        NoaaLocation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
+        NoaaLocation::set_for_name(
+            ctx.get_db(),
+            ctx.sender()
+                .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
+            &station[..],
+        )
+        .await?;
 
         let _ = lines.next();
         let line = lines
@@ -40,7 +46,7 @@ impl NoaaPlugin {
         Ok(())
     }
 
-    async fn lookup_taf(self: Arc<Self>, ctx: Arc<Context>, station: String) -> Result<()> {
+    async fn lookup_taf(&self, ctx: &Context, station: String) -> Result<()> {
         let mut station = station;
         station.make_ascii_uppercase();
 
@@ -51,7 +57,13 @@ impl NoaaPlugin {
         .await?;
 
         // Only set the station if a request was successful.
-        NoaaLocation::set_for_name(ctx.get_db(), ctx.sender()?, &station[..]).await?;
+        NoaaLocation::set_for_name(
+            ctx.get_db(),
+            ctx.sender()
+                .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
+            &station[..],
+        )
+        .await?;
 
         let _ = lines.next();
         for line in lines {
@@ -113,58 +125,72 @@ async fn lines_from_url(url: &str) -> Result<std::io::Lines<std::io::Cursor<Stri
     Ok(std::io::Cursor::new(data).lines())
 }
 
-async fn extract_station(ctx: &Arc<Context>, arg: Option<&str>) -> Result<Option<String>> {
+async fn extract_station(ctx: &Context, arg: Option<&str>) -> Result<Option<String>> {
     match arg {
         Some(station) => Ok(Some(station.to_string())),
-        None => Ok(NoaaLocation::get_by_name(ctx.get_db(), ctx.sender()?)
-            .await?
-            .map(|station| station.station)),
+        None => Ok(NoaaLocation::get_by_name(
+            ctx.get_db(),
+            ctx.sender()
+                .ok_or_else(|| format_err!("couldn't look up station: event missing sender"))?,
+        )
+        .await?
+        .map(|station| station.station)),
+    }
+}
+
+impl NoaaPlugin {
+    async fn handle_metar(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
+        match extract_station(ctx, arg).await? {
+            Some(station) => {
+                self.lookup_metar(ctx, station).await?;
+            }
+            None => {
+                ctx.mention_reply(&format!(
+                    "Missing station argument. Usage: {}metar <station>",
+                    ctx.command_prefix()
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_taf(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
+        match extract_station(ctx, arg).await? {
+            Some(station) => {
+                self.lookup_taf(ctx, station).await?;
+            }
+            None => {
+                ctx.mention_reply(&format!(
+                    "Missing station argument. Usage: {}taf <station>",
+                    ctx.command_prefix()
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
     }
 }
 
 #[async_trait]
-impl Plugin for Arc<NoaaPlugin> {
+impl Plugin for NoaaPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(NoaaPlugin::new())
     }
 
-    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
-        match ctx.as_event() {
-            Event::Command("metar", arg) => match extract_station(ctx, arg).await? {
-                Some(station) => {
-                    let plugin = (*self).clone();
-                    let ctx = (*ctx).clone();
+    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(ctx) = stream.next().await {
+            let res = match ctx.as_event() {
+                Event::Command("metar", arg) => self.handle_metar(&ctx, arg).await,
+                Event::Command("taf", arg) => self.handle_taf(&ctx, arg).await,
+                _ => Ok(()),
+            };
 
-                    crate::spawn(plugin.lookup_metar(ctx, station));
-                }
-                None => {
-                    ctx.mention_reply(&format!(
-                        "Missing station argument. Usage: {}metar <station>",
-                        ctx.command_prefix()
-                    ))
-                    .await?;
-                }
-            },
-
-            Event::Command("taf", arg) => match extract_station(ctx, arg).await? {
-                Some(station) => {
-                    let plugin = (*self).clone();
-                    let ctx = (*ctx).clone();
-
-                    crate::spawn(plugin.lookup_taf(ctx, station));
-                }
-                None => {
-                    ctx.mention_reply(&format!(
-                        "Missing station argument. Usage: {}taf <station>",
-                        ctx.command_prefix()
-                    ))
-                    .await?;
-                }
-            },
-
-            _ => {}
+            crate::check_err(&ctx, res).await;
         }
 
-        Ok(())
+        Err(format_err!("noaa plugin exited early"))
     }
 }

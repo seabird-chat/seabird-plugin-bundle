@@ -14,15 +14,19 @@ mod plugins;
 mod prelude;
 mod utils;
 
-fn spawn<T>(task: T) -> tokio::task::JoinHandle<()>
-where
-    T: std::future::Future<Output = Result<(), anyhow::Error>> + Send + 'static,
-{
-    tokio::task::spawn(async move {
-        if let Err(e) = task.await {
-            error!("Background task failed to execute: {}", e);
-        };
-    })
+async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
+    if let Err(err) = res {
+        if ctx.reply_target().is_some() {
+            let inner = ctx
+                .mention_reply(&format!("unexpected error: {}", err))
+                .await;
+            if let Err(inner) = inner {
+                error!("unexpected error ({}) while handling: {}", inner, err);
+            }
+        } else {
+            error!("unexpected error: {}", err);
+        }
+    }
 }
 
 #[tokio::main]
@@ -59,12 +63,12 @@ async fn main() -> error::Result<()> {
         dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or_else(|_| "!".to_string()),
         dotenv::var("SEABIRD_ENABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
-            .split_terminator(",")
+            .split_terminator(',')
             .map(|s| s.to_string())
             .collect(),
         dotenv::var("SEABIRD_DISABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
-            .split_terminator(",")
+            .split_terminator(',')
             .map(|s| s.to_string())
             .collect(),
     );

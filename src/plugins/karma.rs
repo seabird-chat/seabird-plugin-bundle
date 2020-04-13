@@ -61,53 +61,65 @@ impl KarmaPlugin {
     }
 }
 
+impl KarmaPlugin {
+    async fn handle_karma(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
+        let name = Karma::sanitize_name(arg);
+        let karma = Karma::get_by_name(ctx.get_db(), &name).await?;
+
+        ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_privmsg(&self, ctx: &Arc<Context>, msg: &str) -> Result<()> {
+        let captures: Vec<_> = self.re.captures_iter(msg).collect();
+
+        if !captures.is_empty() {
+            for capture in captures {
+                let mut name = &capture[1];
+
+                // TODO: switch to strip_prefix and strip_suffix when they're available.
+                if name.starts_with('"') && name.ends_with('"') {
+                    name = &name[1..name.len() - 1];
+                }
+
+                // Len returns a usize which won't fit in an i64, so we need to try and
+                // convert it.
+                let mut change: i32 = (&capture[2].len() - 1).try_into()?;
+                if capture[2].starts_with('-') {
+                    change *= -1;
+                }
+
+                let cleaned_name = Karma::sanitize_name(name);
+                let karma = Karma::create_or_update(ctx.get_db(), &cleaned_name, change).await?;
+
+                ctx.reply(&format!("{}'s karma is now {}", name, karma.score))
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl Plugin for KarmaPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(KarmaPlugin::new())
     }
 
-    async fn handle_message(&self, ctx: &Arc<Context>) -> Result<()> {
-        match ctx.as_event() {
-            Event::Command("karma", Some(arg)) => {
-                let name = Karma::sanitize_name(arg);
-                let karma = Karma::get_by_name(ctx.get_db(), &name).await?;
+    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(ctx) = stream.next().await {
+            let res = match ctx.as_event() {
+                Event::Command("karma", Some(arg)) => self.handle_karma(&ctx, arg).await,
+                Event::Privmsg(_, msg) => self.handle_privmsg(&ctx, msg).await,
+                _ => Ok(()),
+            };
 
-                ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
-                    .await?;
-            }
-
-            Event::Privmsg(_, msg) => {
-                let captures: Vec<_> = self.re.captures_iter(msg).collect();
-
-                if !captures.is_empty() {
-                    for capture in captures {
-                        let mut name = &capture[1];
-
-                        // TODO: switch to strip_prefix and strip_suffix when they're available.
-                        if name.starts_with('"') && name.ends_with('"') {
-                            name = &name[1..name.len() - 1];
-                        }
-
-                        // Len returns a usize which won't fit in an i64, so we need to try and
-                        // convert it.
-                        let mut change: i32 = (&capture[2].len() - 1).try_into()?;
-                        if capture[2].starts_with('-') {
-                            change *= -1;
-                        }
-
-                        let cleaned_name = Karma::sanitize_name(name);
-                        let karma =
-                            Karma::create_or_update(ctx.get_db(), &cleaned_name, change).await?;
-
-                        ctx.reply(&format!("{}'s karma is now {}", name, karma.score))
-                            .await?;
-                    }
-                }
-            }
-            _ => {}
+            crate::check_err(&ctx, res).await;
         }
 
-        Ok(())
+        Err(format_err!("karma plugin exited early"))
     }
 }
