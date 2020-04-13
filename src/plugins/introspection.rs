@@ -1,5 +1,6 @@
 use std::fmt::Write;
 
+use git_version::git_version;
 use time::Instant;
 
 use crate::prelude::*;
@@ -17,6 +18,7 @@ impl IntrospectionPlugin {
 }
 
 const SEABIRD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const GIT_VERSION: &'static str = git_version!();
 
 #[async_trait]
 impl Plugin for IntrospectionPlugin {
@@ -45,7 +47,7 @@ impl Plugin for IntrospectionPlugin {
                     ctx.mention_reply(&ret[..]).await?;
                 }
                 Event::Command("version", _) => {
-                    ctx.mention_reply(&format!("Seabird version {}", SEABIRD_VERSION))
+                    ctx.mention_reply(&format!("version:{} git:{}", SEABIRD_VERSION, GIT_VERSION))
                         .await?;
                 }
                 _ => {}
