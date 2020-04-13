@@ -19,8 +19,8 @@ pub use self::net_tools::NetToolsPlugin;
 mod noaa;
 pub use self::noaa::NoaaPlugin;
 
-mod uptime;
-pub use self::uptime::UptimePlugin;
+mod introspection;
+pub use self::introspection::IntrospectionPlugin;
 
 mod url;
 pub use self::url::UrlPlugin;

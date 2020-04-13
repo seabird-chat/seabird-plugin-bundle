@@ -36,6 +36,7 @@ tokio-postgres = "0.5"
 trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns", version = "0.19", features = ["tokio-runtime"] }
 url = "2.1"
 async-minecraft-ping = "0.2"
+git-version = "0.3"
 
 # In order to get these packages working properly, we need to use the versions
 # from git.
