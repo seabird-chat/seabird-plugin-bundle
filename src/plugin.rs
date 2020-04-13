@@ -43,7 +43,7 @@ pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
         "minecraft",
         "net_tools",
         "noaa",
-        "uptime",
+        "introspection",
         "url",
     ];
 
@@ -120,8 +120,8 @@ pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
         ret.push(start_plugin::<plugins::NoaaPlugin>()?);
     }
 
-    if config.plugin_enabled("uptime") {
-        ret.push(start_plugin::<plugins::UptimePlugin>()?);
+    if config.plugin_enabled("introspection") {
+        ret.push(start_plugin::<plugins::IntrospectionPlugin>()?);
     }
 
     if config.plugin_enabled("url") {
