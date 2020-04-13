@@ -47,7 +47,7 @@ impl Plugin for IntrospectionPlugin {
                     ctx.mention_reply(&ret[..]).await?;
                 }
                 Event::Command("version", _) => {
-                    ctx.mention_reply(&format!("version:{} git:{}", SEABIRD_VERSION, GIT_VERSION))
+                    ctx.mention_reply(&format!("seabird {}-{}", SEABIRD_VERSION, GIT_VERSION))
                         .await?;
                 }
                 _ => {}
