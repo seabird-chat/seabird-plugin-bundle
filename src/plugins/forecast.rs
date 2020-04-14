@@ -1,16 +1,18 @@
-use crate::utils::{darksky, maps};
+use crate::utils::to_sentence_case;
+
+use crate::utils::{maps, openweathermap};
 
 use crate::prelude::*;
 
 pub struct ForecastPlugin {
-    darksky: darksky::Client,
+    darksky: openweathermap::Client,
     maps: maps::Client,
 }
 
 impl ForecastPlugin {
-    pub fn new(darksky_api_key: String, maps_api_key: String) -> Self {
+    pub fn new(openweathermap_api_key: String, maps_api_key: String) -> Self {
         ForecastPlugin {
-            darksky: darksky::Client::new(darksky_api_key),
+            darksky: openweathermap::Client::new(openweathermap_api_key),
             maps: maps::Client::new(maps_api_key),
         }
     }
@@ -87,23 +89,15 @@ impl ForecastPlugin {
         )
         .await?;
 
-        let temp_unit = match &res.flags.units[..] {
-            "auto" => "°",
-            "us" => "°F",
-            _ => "°C",
-        };
-
         ctx.mention_reply(&format!(
-            "{}. Currently {:.1}{}. High {:.2}{}, Low {:.2}{}, Humidity {:.0}%. {}",
+            "{}. Currently {:.1}°F, Feels Like {:.1}°F. High {:.1}°F, Low {:.1}°F. Humidity {}%. {}.",
             location.address,
-            res.data.temperature,
-            temp_unit,
-            res.data.temperature_high,
-            temp_unit,
-            res.data.temperature_low,
-            temp_unit,
-            res.data.humidity,
-            res.data.summary,
+            res.temperature,
+            res.temperature_feels_like,
+            res.temperature_high,
+            res.temperature_low,
+            res.humidity,
+            to_sentence_case(&res.summary),
         ))
         .await?;
 
@@ -124,27 +118,19 @@ impl ForecastPlugin {
         )
         .await?;
 
-        let temp_unit = match &res.flags.units[..] {
-            "auto" => "°",
-            "us" => "°F",
-            _ => "°C",
-        };
-
         ctx.mention_reply(&format!("3 day forecast for {}.", location.address))
             .await?;
 
-        for day in res.data.into_iter().skip(1).take(3) {
+        for day in res.into_iter().skip(1).take(3) {
             let weekday = day.time.format("%A");
 
             ctx.mention_reply(&format!(
-                "{}: High {:.2}{}, Low {:.2}{}, Humidity {:.0}%. {}",
+                "{}: High {:.2}°F, Low {:.2}°F, Humidity {:.0}%. {}.",
                 weekday,
                 day.temperature_high,
-                temp_unit,
                 day.temperature_low,
-                temp_unit,
                 day.humidity,
-                day.summary,
+                to_sentence_case(&day.summary),
             ))
             .await?;
         }
@@ -255,9 +241,9 @@ UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
 impl Plugin for ForecastPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(ForecastPlugin::new(
-            dotenv::var("DARKSKY_API_KEY").map_err(|_| {
+            dotenv::var("OPENWEATHERMAP_API_KEY").map_err(|_| {
                 anyhow::format_err!(
-                    "Missing $DARKSKY_API_KEY. Required by the \"forecast\" plugin."
+                    "Missing $OPENWEATHERMAP_API_KEY. Required by the \"forecast\" plugin."
                 )
             })?,
             dotenv::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
