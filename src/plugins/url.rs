@@ -46,9 +46,20 @@ impl UrlPlugin {
         let mut buf = String::new();
 
         // Read in at most 1M of data
-        reqwest::get(parsed_url)
-            .await?
-            .bytes_stream()
+        let resp = reqwest::get(parsed_url).await?;
+
+        // If it's not text/html, we want to return early
+        if resp
+            .headers()
+            .get(http::header::CONTENT_TYPE)
+            .map(|h| h.as_ref())
+            .unwrap_or(b"")
+            != b"text/html"
+        {
+            return Ok(());
+        }
+
+        resp.bytes_stream()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
             .into_async_read()
             .take(1024 * 1024)

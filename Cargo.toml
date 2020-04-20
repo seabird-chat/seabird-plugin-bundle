@@ -24,6 +24,7 @@ maplit = "1.0"
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }
+http = "0.2"
 itertools = "0.9"
 linkify = "0.4"
 rand = "0.7"
