@@ -1,7 +1,8 @@
-use std::time::{Duration};
+use std::time::Duration;
 
 use anyhow::Context as AnyhowContext;
 use async_minecraft_ping::ConnectionConfig;
+use futures::future::{select, Either};
 use tokio::time::interval;
 
 use crate::prelude::*;
@@ -82,14 +83,12 @@ impl MinecraftPlugin {
                 status.description.text,
             );
 
-            if let Some(last_topic) = &self.last_topic {
-                if &topic != last_topic {
-                    bot.send_msg(&Message::new(
-                        "TOPIC".to_string(),
-                        vec![channel.to_string(), topic],
-                    ))
-                    .await?;
+            match self.last_topic.as_ref() {
+                Some(last_topic) if &topic != last_topic => {
+                    bot.send("TOPIC", vec![channel, &topic]).await?
                 }
+                None => bot.send("TOPIC", vec![channel, &topic]).await?,
+                Some(_) => {}
             }
         }
 
@@ -130,51 +129,44 @@ impl Plugin for MinecraftPlugin {
     }
 
     async fn run(mut self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        // TODO(jsvana): make this update loop update the topic at regular intervals
-        // instead of what it's doing now.
-
-        let timer = interval(Duration::from_secs(6));
+        let mut timer = interval(Duration::from_secs(10));
 
         loop {
-            tokio::select! {
-                res = stream.next() => {
-                    if let Some(ctx) = res {
-                        let res = match ctx.as_event() {
-                            Event::Command("mc_players", Some(arg)) => {
-                                self.handle_mc_players(&ctx, arg).await
-                            }
-                            Event::RplTopic {
-                                nick: _,
-                                channel,
-                                topic,
-                            } => {
-                                if let TopicUpdateConfig::Update {
-                                    server_hostname: _,
-                                    server_port: _,
-                                    channel: ref config_channel,
-                                } = self.update_config
-                                {
-                                    if channel == config_channel {
-                                        self.last_topic = Some(topic.to_string());
-                                    }
-                                }
-                                Ok(())
-                            }
-                            _ => Ok(()),
-                        };
+            let next = select(stream.next(), timer.next()).await;
 
-                        crate::check_err(&ctx, res).await;
-                    }
-                },
-                _ = timer.tick() => {
-                    if last_update.elapsed() >= Duration::from_secs(6) {
-                        self.update_topic(&bot).await?;
-                        last_update = Instant::now();
-                    }
-                },
-                //complete => break,
-                //default => unreachable!(),
-            };
+            match next {
+                Either::Left((Some(ctx), _)) => {
+                    let res = match ctx.as_event() {
+                        Event::Command("mc_players", Some(arg)) => {
+                            self.handle_mc_players(&ctx, arg).await
+                        }
+                        Event::RplTopic {
+                            nick: _,
+                            channel,
+                            topic,
+                        } => {
+                            if let TopicUpdateConfig::Update {
+                                server_hostname: _,
+                                server_port: _,
+                                channel: ref config_channel,
+                            } = self.update_config
+                            {
+                                if channel == config_channel {
+                                    self.last_topic = Some(topic.to_string());
+                                }
+                            }
+                            Ok(())
+                        }
+                        _ => Ok(()),
+                    };
+
+                    crate::check_err(&ctx, res).await;
+                }
+                Either::Left((None, _)) => {}
+                Either::Right(_) => {
+                    self.update_topic(&bot).await?;
+                }
+            }
         }
 
         //Err(format_err!("minecraft plugin exited early"))
