@@ -86,10 +86,25 @@ pub struct ClientState {
 
 // Client represents the running bot.
 pub struct Client {
-    plugin_senders: Mutex<Vec<mpsc::Sender<Arc<Context>>>>,
     state: Mutex<Arc<ClientState>>,
+    sender: mpsc::Sender<String>,
 
     db_client: Arc<tokio_postgres::Client>,
+}
+
+impl Client {
+    pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
+        self.send_msg(&irc::Message::new(
+            command.to_string(),
+            params.into_iter().map(|s| s.to_string()).collect(),
+        ))
+        .await
+    }
+
+    pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
+        self.sender.clone().send(msg.to_string()).await?;
+        Ok(())
+    }
 }
 
 impl Client {
@@ -141,7 +156,12 @@ impl Client {
         Err(format_err!("writer_task exited early"))
     }
 
-    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<String>) -> Result<()>
+    async fn reader_task<R>(
+        &self,
+        reader: R,
+        tx_sender: mpsc::Sender<String>,
+        mut plugin_senders: Vec<mpsc::Sender<Arc<Context>>>,
+    ) -> Result<()>
     where
         R: AsyncRead + Unpin,
     {
@@ -170,7 +190,7 @@ impl Client {
             // plugins.
             let ctx = Arc::new(ctx);
 
-            for plugin in self.plugin_senders.lock().await.iter_mut() {
+            for plugin in plugin_senders.iter_mut() {
                 plugin.send(ctx.clone()).await?;
             }
         }
@@ -216,9 +236,6 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         .run_async(&mut db_client)
         .await?;
 
-    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) =
-        crate::plugin::load(&config)?.into_iter().unzip();
-
     // Step 1: Connect to the server
     let addr = config
         .target
@@ -246,14 +263,23 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         config: Arc::new(config),
     });
 
-    let client = Client {
-        plugin_senders: Mutex::new(plugin_senders),
-        state: Mutex::new(state),
+    let client = Arc::new(Client {
+        state: Mutex::new(state.clone()),
         db_client: Arc::new(db_client),
-    };
+        sender: tx_sender.clone(),
+    });
+
+    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) =
+        crate::plugin::load(client.clone(), &state.config)?
+            .into_iter()
+            .unzip();
+
+    // Now that we've used the config to load the plugins, we want to explicitly
+    // drop our reference to the state.
+    drop(state);
 
     let send = client.writer_task(writer, rx_sender);
-    let read = client.reader_task(reader, tx_sender);
+    let read = client.reader_task(reader, tx_sender, plugin_senders);
 
     let (_send, _read, plugins) =
         tokio::try_join!(send, read, try_join_all(plugin_tasks).map_err(|e| e.into()))?;
