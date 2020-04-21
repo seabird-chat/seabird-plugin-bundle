@@ -39,7 +39,7 @@ where
     Ok((sender, handle))
 }
 
-pub fn load(bot: Arc<Client>, config: &Arc<ClientConfig>) -> Result<Vec<PluginMeta>> {
+pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMeta>> {
     let supported_plugins = btreeset![
         "forecast",
         "karma",
@@ -50,6 +50,10 @@ pub fn load(bot: Arc<Client>, config: &Arc<ClientConfig>) -> Result<Vec<PluginMe
         "introspection",
         "url",
     ];
+
+    // This is technically awaiting on a mutex, but at the point load is called,
+    // it's impossible for anything else to have locked the mutex.
+    let config = &bot.current_state().await.config;
 
     // Check that all of the provided plugins are supported
     let mut unknown_plugins = Vec::new();

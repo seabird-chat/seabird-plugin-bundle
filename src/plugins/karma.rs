@@ -109,10 +109,7 @@ impl Plugin for KarmaPlugin {
         Ok(KarmaPlugin::new())
     }
 
-    async fn run(self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        // Drop the bot reference because we don't need it.
-        drop(bot);
-
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("karma", Some(arg)) => self.handle_karma(&ctx, arg).await,

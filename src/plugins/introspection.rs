@@ -26,10 +26,7 @@ impl Plugin for IntrospectionPlugin {
         Ok(IntrospectionPlugin::new())
     }
 
-    async fn run(self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        // Drop the bot reference because we don't need it.
-        drop(bot);
-
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             match ctx.as_event() {
                 Event::Command("uptime", _) => {

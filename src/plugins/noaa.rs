@@ -180,10 +180,7 @@ impl Plugin for NoaaPlugin {
         Ok(NoaaPlugin::new())
     }
 
-    async fn run(self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        // Drop the bot reference because we don't need it.
-        drop(bot);
-
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("metar", arg) => self.handle_metar(&ctx, arg).await,

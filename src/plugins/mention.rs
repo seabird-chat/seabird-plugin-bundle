@@ -8,10 +8,7 @@ impl Plugin for MentionPlugin {
         Ok(MentionPlugin {})
     }
 
-    async fn run(self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        // Drop the bot reference because we don't need it.
-        drop(bot);
-
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             if let Event::Mention(msg) = ctx.as_event() {
                 match msg {

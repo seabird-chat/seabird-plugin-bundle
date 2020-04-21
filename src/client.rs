@@ -84,6 +84,15 @@ pub struct ClientState {
     pub config: Arc<ClientConfig>,
 }
 
+impl ClientState {
+    fn new(config: ClientConfig) -> Arc<Self> {
+        Arc::new(ClientState {
+            current_nick: config.nick.clone(),
+            config: Arc::new(config),
+        })
+    }
+}
+
 // Client represents the running bot.
 pub struct Client {
     state: Mutex<Arc<ClientState>>,
@@ -105,9 +114,25 @@ impl Client {
         self.sender.clone().send(msg.to_string()).await?;
         Ok(())
     }
+
+    pub async fn current_state(&self) -> Arc<ClientState> {
+        self.state.lock().await.clone()
+    }
 }
 
 impl Client {
+    fn new(
+        state: Arc<ClientState>,
+        db_client: tokio_postgres::Client,
+        sender: mpsc::Sender<String>,
+    ) -> Arc<Self> {
+        Arc::new(Client {
+            state: Mutex::new(state),
+            db_client: Arc::new(db_client),
+            sender,
+        })
+    }
+
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
         match ctx.as_event() {
             Event::Raw("PING", params) => {
@@ -257,26 +282,12 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     let (tx_sender, rx_sender) = mpsc::channel(100);
 
     send_startup_messages(&config, tx_sender.clone()).await?;
+    let client = Client::new(ClientState::new(config), db_client, tx_sender.clone());
 
-    let state = Arc::new(ClientState {
-        current_nick: config.nick.clone(),
-        config: Arc::new(config),
-    });
-
-    let client = Arc::new(Client {
-        state: Mutex::new(state.clone()),
-        db_client: Arc::new(db_client),
-        sender: tx_sender.clone(),
-    });
-
-    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) =
-        crate::plugin::load(client.clone(), &state.config)?
-            .into_iter()
-            .unzip();
-
-    // Now that we've used the config to load the plugins, we want to explicitly
-    // drop our reference to the state.
-    drop(state);
+    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) = crate::plugin::load(client.clone())
+        .await?
+        .into_iter()
+        .unzip();
 
     let send = client.writer_task(writer, rx_sender);
     let read = client.reader_task(reader, tx_sender, plugin_senders);
