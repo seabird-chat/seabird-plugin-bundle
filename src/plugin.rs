@@ -15,7 +15,7 @@ pub trait Plugin {
     where
         Self: Sized;
 
-    async fn run(self, stream: Receiver<Arc<Context>>) -> Result<()>;
+    async fn run(self, bot: Arc<Client>, stream: Receiver<Arc<Context>>) -> Result<()>;
 }
 
 // TODO: this should be a struct type rather than a tuple, but it's so much more
@@ -25,17 +25,21 @@ type PluginMeta = (
     tokio::task::JoinHandle<Result<()>>,
 );
 
-fn start_plugin<P>() -> Result<PluginMeta>
+fn start_plugin<P>(bot: &Arc<Client>) -> Result<PluginMeta>
 where
     P: Plugin + Send + 'static,
 {
     let (sender, receiver) = mpsc::channel(PLUGIN_MESSAGE_BUF);
     let plugin = P::new_from_env()?;
-    let handle = tokio::task::spawn(async move { plugin.run(receiver).await });
+    let bot = bot.clone();
+
+    // TODO: we have a Result getting lost here
+    let handle = tokio::task::spawn(async move { plugin.run(bot, receiver).await });
+
     Ok((sender, handle))
 }
 
-pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
+pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMeta>> {
     let supported_plugins = btreeset![
         "forecast",
         "karma",
@@ -46,6 +50,10 @@ pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
         "introspection",
         "url",
     ];
+
+    // This is technically awaiting on a mutex, but at the point load is called,
+    // it's impossible for anything else to have locked the mutex.
+    let config = &bot.current_state().await.config;
 
     // Check that all of the provided plugins are supported
     let mut unknown_plugins = Vec::new();
@@ -97,35 +105,35 @@ pub fn load(config: &ClientConfig) -> Result<Vec<PluginMeta>> {
     // Here we optionally instantiate all supported plugins.
 
     if config.plugin_enabled("forecast") {
-        ret.push(start_plugin::<plugins::ForecastPlugin>()?);
+        ret.push(start_plugin::<plugins::ForecastPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("karma") {
-        ret.push(start_plugin::<plugins::KarmaPlugin>()?);
+        ret.push(start_plugin::<plugins::KarmaPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("minecraft") {
-        ret.push(start_plugin::<plugins::MinecraftPlugin>()?);
+        ret.push(start_plugin::<plugins::MinecraftPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("mention") {
-        ret.push(start_plugin::<plugins::MentionPlugin>()?);
+        ret.push(start_plugin::<plugins::MentionPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("net_tools") {
-        ret.push(start_plugin::<plugins::NetToolsPlugin>()?);
+        ret.push(start_plugin::<plugins::NetToolsPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("noaa") {
-        ret.push(start_plugin::<plugins::NoaaPlugin>()?);
+        ret.push(start_plugin::<plugins::NoaaPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("introspection") {
-        ret.push(start_plugin::<plugins::IntrospectionPlugin>()?);
+        ret.push(start_plugin::<plugins::IntrospectionPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("url") {
-        ret.push(start_plugin::<plugins::UrlPlugin>()?);
+        ret.push(start_plugin::<plugins::UrlPlugin>(&bot)?);
     }
 
     Ok(ret)

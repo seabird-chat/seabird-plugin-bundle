@@ -84,15 +84,55 @@ pub struct ClientState {
     pub config: Arc<ClientConfig>,
 }
 
+impl ClientState {
+    fn new(config: ClientConfig) -> Arc<Self> {
+        Arc::new(ClientState {
+            current_nick: config.nick.clone(),
+            config: Arc::new(config),
+        })
+    }
+}
+
 // Client represents the running bot.
 pub struct Client {
-    plugin_senders: Mutex<Vec<mpsc::Sender<Arc<Context>>>>,
     state: Mutex<Arc<ClientState>>,
+    sender: mpsc::Sender<String>,
 
     db_client: Arc<tokio_postgres::Client>,
 }
 
 impl Client {
+    pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
+        self.send_msg(&irc::Message::new(
+            command.to_string(),
+            params.into_iter().map(|s| s.to_string()).collect(),
+        ))
+        .await
+    }
+
+    pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
+        self.sender.clone().send(msg.to_string()).await?;
+        Ok(())
+    }
+
+    pub async fn current_state(&self) -> Arc<ClientState> {
+        self.state.lock().await.clone()
+    }
+}
+
+impl Client {
+    fn new(
+        state: Arc<ClientState>,
+        db_client: tokio_postgres::Client,
+        sender: mpsc::Sender<String>,
+    ) -> Arc<Self> {
+        Arc::new(Client {
+            state: Mutex::new(state),
+            db_client: Arc::new(db_client),
+            sender,
+        })
+    }
+
     async fn handle_message(&self, ctx: &Context) -> Result<()> {
         match ctx.as_event() {
             Event::Raw("PING", params) => {
@@ -141,7 +181,12 @@ impl Client {
         Err(format_err!("writer_task exited early"))
     }
 
-    async fn reader_task<R>(&self, reader: R, tx_sender: mpsc::Sender<String>) -> Result<()>
+    async fn reader_task<R>(
+        &self,
+        reader: R,
+        tx_sender: mpsc::Sender<String>,
+        mut plugin_senders: Vec<mpsc::Sender<Arc<Context>>>,
+    ) -> Result<()>
     where
         R: AsyncRead + Unpin,
     {
@@ -170,7 +215,7 @@ impl Client {
             // plugins.
             let ctx = Arc::new(ctx);
 
-            for plugin in self.plugin_senders.lock().await.iter_mut() {
+            for plugin in plugin_senders.iter_mut() {
                 plugin.send(ctx.clone()).await?;
             }
         }
@@ -216,9 +261,6 @@ pub async fn run(config: ClientConfig) -> Result<()> {
         .run_async(&mut db_client)
         .await?;
 
-    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) =
-        crate::plugin::load(&config)?.into_iter().unzip();
-
     // Step 1: Connect to the server
     let addr = config
         .target
@@ -240,20 +282,15 @@ pub async fn run(config: ClientConfig) -> Result<()> {
     let (tx_sender, rx_sender) = mpsc::channel(100);
 
     send_startup_messages(&config, tx_sender.clone()).await?;
+    let client = Client::new(ClientState::new(config), db_client, tx_sender.clone());
 
-    let state = Arc::new(ClientState {
-        current_nick: config.nick.clone(),
-        config: Arc::new(config),
-    });
-
-    let client = Client {
-        plugin_senders: Mutex::new(plugin_senders),
-        state: Mutex::new(state),
-        db_client: Arc::new(db_client),
-    };
+    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) = crate::plugin::load(client.clone())
+        .await?
+        .into_iter()
+        .unzip();
 
     let send = client.writer_task(writer, rx_sender);
-    let read = client.reader_task(reader, tx_sender);
+    let read = client.reader_task(reader, tx_sender, plugin_senders);
 
     let (_send, _read, plugins) =
         tokio::try_join!(send, read, try_join_all(plugin_tasks).map_err(|e| e.into()))?;

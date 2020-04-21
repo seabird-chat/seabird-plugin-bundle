@@ -80,7 +80,7 @@ impl Plugin for UrlPlugin {
         Ok(UrlPlugin::new())
     }
 
-    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
                 self.link_finder.links(msg).collect()

@@ -38,7 +38,7 @@ impl Plugin for MinecraftPlugin {
         Ok(MinecraftPlugin {})
     }
 
-    async fn run(self, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("mc_players", Some(arg)) => self.handle_mc_players(&ctx, arg).await,
