@@ -17,8 +17,8 @@ impl IntrospectionPlugin {
     }
 }
 
-const SEABIRD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
-const GIT_VERSION: &'static str = git_version!();
+const SEABIRD_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_VERSION: &str = git_version!();
 
 #[async_trait]
 impl Plugin for IntrospectionPlugin {

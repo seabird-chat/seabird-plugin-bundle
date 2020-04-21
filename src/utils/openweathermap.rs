@@ -69,7 +69,7 @@ impl Into<Forecast> for OneCallResponse {
         self.daily
             .into_iter()
             .map(|daily| {
-                let summary = if daily.weather.len() == 0 {
+                let summary = if daily.weather.is_empty() {
                     "unknown".to_string()
                 } else {
                     daily.weather.into_iter().map(|w| w.description).join(", ")
@@ -89,7 +89,7 @@ impl Into<Forecast> for OneCallResponse {
 
 impl Into<CurrentWeather> for OneCallResponse {
     fn into(self) -> CurrentWeather {
-        let summary = if self.current.weather.len() == 0 {
+        let summary = if self.current.weather.is_empty() {
             "unknown".to_string()
         } else {
             self.current
