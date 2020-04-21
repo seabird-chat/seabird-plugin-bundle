@@ -20,6 +20,9 @@ Settings can either be included as a part of the environment or in a .env file.
 - `SEABIRD_DISABLED_PLUGINS` - comma-separated list of plugins that should not be enabled
 - `DARKSKY_API_KEY` - needed for forecast/weather support
 - `GOOGLE_MAPS_API_KEY` - needed for forecast/weather support
+- `MINECRAFT_TOPIC_UPDATE_ENABLED` - allow the Minecraft plugin to update a channel's topic with server information
+- `MINECRAFT_TOPIC_UPDATE_HOSTPORT` - `hostname[:port]` for the Minecraft plugin topic updater to use
+- `MINECRAFT_TOPIC_UPDATE_CHANNEL` - `#some-channel` IRC channel for the Minecraft plugin topic updater to update
 
 ## Writing a new plugin
 
