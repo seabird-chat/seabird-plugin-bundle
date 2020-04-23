@@ -78,7 +78,7 @@ impl MinecraftPlugin {
                 server_port,
                 status.players.online,
                 status.players.max,
-                status.description.text,
+                status.description.text.split("\n").join(", "),
             );
 
             if topic != last_topic {
