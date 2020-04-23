@@ -8,6 +8,13 @@ pub enum Event<'a> {
     // 001 nick :welcome text
     RplWelcome(&'a str, &'a str),
 
+    // 332 nick #channel :topic
+    RplTopic {
+        nick: &'a str,
+        channel: &'a str,
+        topic: &'a str,
+    },
+
     // PRIVMSG somewhere :!command arg
     Command(&'a str, Option<&'a str>),
 
@@ -38,6 +45,11 @@ impl<'a> Event<'a> {
                 }
             }
             ("001", 2) => Event::RplWelcome(&msg.params[0][..], &msg.params[1][..]),
+            ("332", 3) => Event::RplTopic {
+                nick: &msg.params[0][..],
+                channel: &msg.params[1][..],
+                topic: &msg.params[2][..],
+            },
             _ => Event::Raw(
                 &msg.command[..],
                 msg.params.iter().map(|s| s.as_str()).collect(),

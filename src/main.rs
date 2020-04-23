@@ -12,7 +12,7 @@ mod migrations;
 mod plugin;
 mod plugins;
 mod prelude;
-mod utils;
+pub(crate) mod utils;
 
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
