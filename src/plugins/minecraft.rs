@@ -15,6 +15,7 @@ enum TopicUpdateConfig {
         server_hostname: String,
         server_port: u16,
         channel: String,
+        update_interval: Duration,
     },
 }
 
@@ -25,7 +26,6 @@ struct HostPort {
 
 pub struct MinecraftPlugin {
     update_config: TopicUpdateConfig,
-    last_topic: Option<String>,
 }
 
 fn split_host_port(hostport: &str, default_port: &str) -> Result<HostPort> {
@@ -61,13 +61,29 @@ impl MinecraftPlugin {
         Ok(())
     }
 
-    async fn update_topic(&self, bot: &Arc<Client>) -> Result<()> {
+    async fn query_topic(&self, bot: &Arc<Client>) -> Result<()> {
+        if let TopicUpdateConfig::Update {
+            ref channel, ..
+        } = self.update_config {
+            bot.send("TOPIC", vec![channel]).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn update_topic(&self, bot: &Arc<Client>, incoming_channel: &str, last_topic: &str) -> Result<()> {
         if let TopicUpdateConfig::Update {
             ref server_hostname,
             server_port,
             ref channel,
+            ..
         } = self.update_config
         {
+            // Only update the topic for our configured channel
+            if channel != incoming_channel {
+                return Ok(());
+            }
+
             let config =
                 ConnectionConfig::build(server_hostname.to_string()).with_port(server_port);
             let mut connection = config.connect().await?;
@@ -83,16 +99,60 @@ impl MinecraftPlugin {
                 status.description.text,
             );
 
-            match self.last_topic.as_ref() {
-                Some(last_topic) if &topic != last_topic => {
-                    bot.send("TOPIC", vec![channel, &topic]).await?
-                }
-                None => bot.send("TOPIC", vec![channel, &topic]).await?,
-                Some(_) => {}
+            if topic != last_topic {
+                bot.send("TOPIC", vec![channel, &topic]).await?;
             }
         }
 
         Ok(())
+    }
+
+    async fn handle_message(&self, bot: &Arc<Client>, context: Arc<Context>) {
+        let res = match context.as_event() {
+            Event::Command("mc_players", Some(arg)) => {
+                self.handle_mc_players(&context, arg).await
+            }
+            Event::RplTopic {
+                nick: _,
+                channel,
+                topic,
+            } => {
+                self.update_topic(&bot, channel, topic).await
+            }
+            _ => Ok(()),
+        };
+
+        crate::check_err(&context, res).await;
+    }
+
+    async fn run_update_loop(&self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        if let TopicUpdateConfig::Update { update_interval, .. } = self.update_config {
+            let mut timer = interval(update_interval);
+
+            loop {
+                let next = select(stream.next(), timer.next()).await;
+
+                match next {
+                    Either::Left((Some(context), _)) => {
+                        self.handle_message(&bot, context).await;
+                    }
+                    Either::Right(_) => {
+                        self.query_topic(&bot).await?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_only_read_commands(&self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+        while let Some(context) = stream.next().await {
+            self.handle_message(&bot, context).await;
+        }
+
+        Err(format_err!("karma plugin exited early"))
     }
 }
 
@@ -111,12 +171,20 @@ impl Plugin for MinecraftPlugin {
                 "$MINECRAFT_TOPIC_UPDATE_SERVER_HOSTPORT is invalid. Required by the \"minecraft\" plugin because $MINECRAFT_TOPIC_UPDATE_ENABLED was set to true.".to_string()
             })?;
 
+            let channel = dotenv::var("MINECRAFT_TOPIC_UPDATE_CHANNEL").with_context(|| {
+                "Missing $MINECRAFT_TOPIC_UPDATE_CHANNEL. Required by the \"minecraft\" plugin because MINECRAFT_TOPIC_UPDATE_ENABLED was set to true.".to_string()
+            })?;
+
+            let update_interval_seconds = dotenv::var("MINECRAFT_TOPIC_UPDATE_INTERVAL_SECONDS").unwrap_or_else(|_| "60".to_string()).parse::<u64>().with_context(|| {
+                "$MINECRAFT_TOPIC_UPDATE_INTERVAL_SECONDS has invalid duration. Required by the \"minecraft\" plugin because MINECRAFT_TOPIC_UPDATE_ENABLED was set to true.".to_string()
+            })?;
+            let update_interval = Duration::from_secs(update_interval_seconds);
+
             TopicUpdateConfig::Update {
                 server_hostname: hostport.host,
                 server_port: hostport.port,
-                channel: dotenv::var("MINECRAFT_TOPIC_UPDATE_CHANNEL").with_context(|| {
-                    "Missing $MINECRAFT_TOPIC_UPDATE_CHANNEL. Required by the \"minecraft\" plugin because MINECRAFT_TOPIC_UPDATE_ENABLED was set to true.".to_string()
-                })?,
+                channel,
+                update_interval,
             }
         } else {
             TopicUpdateConfig::NoUpdate
@@ -124,51 +192,16 @@ impl Plugin for MinecraftPlugin {
 
         Ok(MinecraftPlugin {
             update_config,
-            last_topic: None,
         })
     }
 
-    async fn run(mut self, bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
-        let mut timer = interval(Duration::from_secs(10));
-
-        loop {
-            let next = select(stream.next(), timer.next()).await;
-
-            match next {
-                Either::Left((Some(ctx), _)) => {
-                    let res = match ctx.as_event() {
-                        Event::Command("mc_players", Some(arg)) => {
-                            self.handle_mc_players(&ctx, arg).await
-                        }
-                        Event::RplTopic {
-                            nick: _,
-                            channel,
-                            topic,
-                        } => {
-                            if let TopicUpdateConfig::Update {
-                                server_hostname: _,
-                                server_port: _,
-                                channel: ref config_channel,
-                            } = self.update_config
-                            {
-                                if channel == config_channel {
-                                    self.last_topic = Some(topic.to_string());
-                                }
-                            }
-                            Ok(())
-                        }
-                        _ => Ok(()),
-                    };
-
-                    crate::check_err(&ctx, res).await;
-                }
-                Either::Left((None, _)) => {}
-                Either::Right(_) => {
-                    self.update_topic(&bot).await?;
-                }
+    async fn run(self, bot: Arc<Client>, stream: Receiver<Arc<Context>>) -> Result<()> {
+        // Only run the update loop if we actually want to update the topic
+        match self.update_config {
+            TopicUpdateConfig::Update { .. } => self.run_update_loop(bot, stream).await,
+            TopicUpdateConfig::NoUpdate => {
+                self.run_only_read_commands(bot, stream).await
             }
         }
-
-        //Err(format_err!("minecraft plugin exited early"))
     }
 }
