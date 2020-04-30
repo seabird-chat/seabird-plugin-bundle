@@ -1,4 +1,5 @@
 use std::io;
+use std::time::Duration;
 
 use futures::{AsyncReadExt, TryStreamExt};
 use regex::Regex;
@@ -46,7 +47,12 @@ impl UrlPlugin {
         let mut buf = String::new();
 
         // Read in at most 1M of data
-        let resp = reqwest::get(parsed_url).await?;
+        let resp = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()?
+            .get(parsed_url)
+            .send()
+            .await?;
 
         // If it's not text/html, we want to return early
         if resp
@@ -80,9 +86,9 @@ impl Plugin for UrlPlugin {
         Ok(UrlPlugin::new())
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
-            let urls: Vec<_> = if let Event::Privmsg(_, msg) = ctx.as_event() {
+            let urls: Vec<_> = if let Event::Message(_, msg) = ctx.as_event() {
                 self.link_finder.links(msg).collect()
             } else {
                 Vec::new()

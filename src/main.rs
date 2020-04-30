@@ -14,6 +14,10 @@ mod plugins;
 mod prelude;
 pub(crate) mod utils;
 
+pub mod proto {
+    tonic::include_proto!("seabird");
+}
+
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
         if ctx.reply_target().is_some() {
@@ -51,16 +55,12 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = client::ClientConfig::new(
-        dotenv::var("SEABIRD_HOST")
-            .context("Missing $SEABIRD_HOST. You must specify a host for the bot to connect to.")?,
-        dotenv::var("SEABIRD_NICK")
-            .context("Missing $SEABIRD_NICK. You must specify a nickname for the bot.")?,
-        dotenv::var("SEABIRD_USER").ok(),
-        dotenv::var("SEABIRD_NAME").ok(),
-        dotenv::var("SEABIRD_PASS").ok(),
+        dotenv::var("SEABIRD_URL")
+            .context("Missing $SEABIRD_URL. You must specify a Seabird host.")?,
+        dotenv::var("SEABIRD_TOKEN")
+            .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
         dotenv::var("DATABASE_URL")
             .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
-        dotenv::var("SEABIRD_COMMAND_PREFIX").unwrap_or_else(|_| "!".to_string()),
         dotenv::var("SEABIRD_ENABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
             .split_terminator(',')
@@ -73,5 +73,6 @@ async fn main() -> error::Result<()> {
             .collect(),
     );
 
-    client::run(config).await
+    let client = client::Client::new(config).await?;
+    client.run().await
 }

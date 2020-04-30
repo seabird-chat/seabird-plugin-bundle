@@ -1,25 +1,19 @@
 use std::collections::BTreeSet;
-use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
 use futures::future::{try_join_all, TryFutureExt};
-use native_tls::TlsConnector;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
-use tokio::net::TcpStream;
+use http::Uri;
 use tokio::stream::StreamExt;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{broadcast, Mutex};
+use tonic::transport::{Channel, ClientTlsConfig};
 
 use crate::prelude::*;
+use crate::proto::seabird_client::SeabirdClient;
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
-    pub target: String,
-    pub nick: String,
-    pub user: String,
-    pub name: String,
-    pub password: Option<String>,
-
-    pub command_prefix: String,
+    pub url: String,
+    pub token: String,
 
     pub enabled_plugins: BTreeSet<String>,
     pub disabled_plugins: BTreeSet<String>,
@@ -28,29 +22,17 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        host: String,
-        nick: String,
-        user: Option<String>,
-        name: Option<String>,
-        password: Option<String>,
+        url: String,
+        token: String,
         db_url: String,
-        command_prefix: String,
         enabled_plugins: BTreeSet<String>,
         disabled_plugins: BTreeSet<String>,
     ) -> Self {
-        let user = user.unwrap_or_else(|| nick.clone());
-        let name = name.unwrap_or_else(|| user.clone());
-
         ClientConfig {
-            target: host,
-            nick,
-            user,
-            name,
-            password,
+            url,
+            token,
             db_url,
-            command_prefix,
             enabled_plugins,
             disabled_plugins,
         }
@@ -76,278 +58,175 @@ impl ClientConfig {
     }
 }
 
-// ClientState represents the internal state of the client at any given point in
-// time.
-#[derive(Debug)]
-pub struct ClientState {
-    pub current_nick: String,
-    pub config: Arc<ClientConfig>,
-}
-
-impl ClientState {
-    fn new(config: ClientConfig) -> Arc<Self> {
-        Arc::new(ClientState {
-            current_nick: config.nick.clone(),
-            config: Arc::new(config),
-        })
-    }
-}
-
 // Client represents the running bot.
+#[derive(Debug)]
 pub struct Client {
-    state: Mutex<Arc<ClientState>>,
-    sender: mpsc::Sender<String>,
-
+    config: ClientConfig,
+    identity: Option<proto::Identity>,
+    inner: Mutex<SeabirdClient<tonic::transport::Channel>>,
     db_client: Arc<tokio_postgres::Client>,
+    broadcast: broadcast::Sender<Arc<Context>>,
 }
 
 impl Client {
-    pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
-        self.send_msg(&irc::Message::new(
-            command.to_string(),
-            params.into_iter().map(|s| s.to_string()).collect(),
-        ))
-        .await
-    }
-
-    pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
-        self.sender.clone().send(msg.to_string()).await?;
+    pub async fn send_message(&self, target: &str, message: &str) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .send_message(proto::SendMessageRequest {
+                identity: self.identity.clone(),
+                target: target.to_string(),
+                message: message.to_string(),
+            })
+            .await?;
         Ok(())
     }
 
-    pub async fn current_state(&self) -> Arc<ClientState> {
-        self.state.lock().await.clone()
+    pub fn subscribe(&self) -> broadcast::Receiver<Arc<Context>> {
+        self.broadcast.subscribe()
+    }
+
+    pub fn get_config(&self) -> &ClientConfig {
+        &self.config
     }
 }
 
 impl Client {
-    fn new(
-        state: Arc<ClientState>,
-        db_client: tokio_postgres::Client,
-        sender: mpsc::Sender<String>,
-    ) -> Arc<Self> {
-        Arc::new(Client {
-            state: Mutex::new(state),
-            db_client: Arc::new(db_client),
-            sender,
-        })
-    }
+    pub async fn new(config: ClientConfig) -> Result<Self> {
+        let (mut db_client, db_connection) =
+            tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
 
-    async fn handle_message(&self, ctx: &Context) -> Result<()> {
-        match ctx.as_event() {
-            Event::Raw("PING", params) => {
-                ctx.send("PONG", params).await?;
+        // The connection object performs the actual communication with the
+        // database, so spawn it off to run on its own.
+        //
+        // TODO: make sure it actually fails the bot if it exits.
+        tokio::spawn(async move {
+            if let Err(e) = db_connection.await {
+                panic!("connection error: {}", e);
             }
-            Event::RplWelcome(client, _) => {
-                info!("Connected!");
+        });
 
-                ctx.send("JOIN", vec!["#main"]).await?;
-                ctx.send("JOIN", vec!["#encoded"]).await?;
-                ctx.send("JOIN", vec!["#encoded-test"]).await?;
-                ctx.send("JOIN", vec!["#minecraft"]).await?;
+        crate::migrations::runner()
+            .run_async(&mut db_client)
+            .await?;
 
-                // Copy what the server called us.
-                let mut guard = self.state.lock().await;
-                let state = &mut *guard;
-                *state = Arc::new(ClientState {
-                    current_nick: client.to_string(),
-                    config: state.config.clone(),
-                });
+        let identity = Some(proto::Identity {
+            auth_method: Some(proto::identity::AuthMethod::Token(config.token.clone())),
+        });
 
-                debug!("Setting current nick to \"{}\"", state.current_nick);
+        let uri: Uri = config.url.parse().context("failed to parse SEABIRD_URL")?;
+        let mut channel_builder = Channel::builder(uri.clone());
+
+        match uri.scheme_str() {
+            None | Some("https") => {
+                println!("Enabling tls");
+                channel_builder = channel_builder
+                    .tls_config(ClientTlsConfig::new().domain_name(uri.host().unwrap()));
             }
             _ => {}
         }
 
-        Ok(())
+        let channel = channel_builder
+            .connect()
+            .await
+            .context("Failed to connect to seabird")?;
+
+        let seabird_client = crate::proto::seabird_client::SeabirdClient::new(channel);
+
+        let (sender, _) = broadcast::channel(100);
+
+        Ok(Client {
+            config,
+            identity,
+            broadcast: sender,
+            db_client: Arc::new(db_client),
+            inner: Mutex::new(seabird_client),
+        })
     }
 
-    async fn writer_task<T>(
-        &self,
-        mut writer: T,
-        mut rx_sender: mpsc::Receiver<String>,
-    ) -> Result<()>
-    where
-        T: AsyncWrite + Unpin,
-    {
-        while let Some(message) = rx_sender.recv().await {
-            trace!("--> {}", message);
-            writer.write_all(message.as_bytes()).await?;
-            writer.write_all(b"\r\n").await?;
-            writer.flush().await?;
-        }
+    async fn reader_task(self: &Arc<Self>) -> Result<()> {
+        let mut stream = self
+            .inner
+            .lock()
+            .await
+            .stream_events(proto::StreamEventsRequest {
+                identity: self.identity.clone(),
+                commands: HashMap::new(),
+            })
+            .await?
+            .into_inner();
 
-        // TODO: this is actually an error - the send queue dried up.
-        Err(format_err!("writer_task exited early"))
-    }
-
-    async fn reader_task<R>(
-        &self,
-        reader: R,
-        tx_sender: mpsc::Sender<String>,
-        mut plugin_senders: Vec<mpsc::Sender<Arc<Context>>>,
-    ) -> Result<()>
-    where
-        R: AsyncRead + Unpin,
-    {
-        let mut stream = BufReader::new(reader).lines();
-
-        while let Some(line) = stream.next().await.transpose()? {
-            let msg: irc::Message = line.parse()?;
-
-            let mut ctx = Context::new(
-                self.state.lock().await.clone(),
-                msg,
-                tx_sender.clone(),
-                self.db_client.clone(),
-            );
-
-            trace!("<-- {}", ctx.msg);
-
-            // Run any core handlers before plugins.
-            self.handle_message(&ctx).await?;
-
-            // The state may have been changed in handle message, so we
-            // re-create it.
-            ctx.client_state = self.state.lock().await.clone();
+        while let Some(event) = stream.next().await.transpose()? {
+            info!("<-- {:?}", event);
 
             // Create an Arc out of our context to make it easier for async
             // plugins.
-            let ctx = Arc::new(ctx);
+            if let Some(inner) = event.inner {
+                let ctx = Arc::new(Context::new(self.clone(), inner));
 
-            for plugin in plugin_senders.iter_mut() {
-                plugin.send(ctx.clone()).await?;
+                self.broadcast
+                    .send(ctx)
+                    .map_err(|_| format_err!("failed to broadcast incoming event"))?;
+            } else {
+                warn!("Got SeabirdEvent missing an inner");
             }
         }
 
         Err(format_err!("reader_task exited early"))
     }
-}
 
-async fn send_startup_messages(
-    config: &ClientConfig,
-    mut tx_send: mpsc::Sender<String>,
-) -> Result<()> {
-    if let Some(password) = &config.password {
-        tx_send.send(format!("PASS :{}", &password)).await?;
-    }
+    pub async fn run(self) -> Result<()> {
+        let client = Arc::new(self);
 
-    tx_send.send(format!("NICK :{}", &config.nick)).await?;
-    tx_send
-        .send(format!(
-            "USER {} 0.0.0.0 0.0.0.0 :{}",
-            &config.user, &config.name
-        ))
-        .await?;
+        // TODO: it's unfortunately easiest to load plugins in run, even though
+        // it would make more sense in new().
+        let plugin_tasks = crate::plugin::load(client.clone()).await?;
 
-    Ok(())
-}
+        let (_client, plugins) = tokio::try_join!(
+            client.reader_task(),
+            try_join_all(plugin_tasks).map_err(|e| e.into()),
+        )?;
 
-pub async fn run(config: ClientConfig) -> Result<()> {
-    let (mut db_client, db_connection) =
-        tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
-
-    // The connection object performs the actual communication with the
-    // database, so spawn it off to run on its own.
-    //
-    // TODO: make sure it actually fails the bot if it exits.
-    tokio::spawn(async move {
-        if let Err(e) = db_connection.await {
-            panic!("connection error: {}", e);
+        // Ensure no plugins exited
+        for plugin in plugins {
+            plugin?;
         }
-    });
 
-    crate::migrations::runner()
-        .run_async(&mut db_client)
-        .await?;
-
-    // Step 1: Connect to the server
-    let addr = config
-        .target
-        .to_socket_addrs()?
-        .next()
-        .ok_or_else(|| format_err!("Failed to look up address"))?;
-
-    let socket = TcpStream::connect(&addr).await?;
-    let cx = TlsConnector::builder()
-        .danger_accept_invalid_certs(true)
-        .build()?;
-    let cx = tokio_tls::TlsConnector::from(cx);
-
-    let socket = cx.connect(&config.target, socket).await?;
-
-    let (reader, writer) = tokio::io::split(socket);
-
-    // Step 2: Wire up all the pieces
-    let (tx_sender, rx_sender) = mpsc::channel(100);
-
-    send_startup_messages(&config, tx_sender.clone()).await?;
-    let client = Client::new(ClientState::new(config), db_client, tx_sender.clone());
-
-    let (plugin_senders, plugin_tasks): (Vec<_>, Vec<_>) = crate::plugin::load(client.clone())
-        .await?
-        .into_iter()
-        .unzip();
-
-    let send = client.writer_task(writer, rx_sender);
-    let read = client.reader_task(reader, tx_sender, plugin_senders);
-
-    let (_send, _read, plugins) =
-        tokio::try_join!(send, read, try_join_all(plugin_tasks).map_err(|e| e.into()))?;
-
-    // Ensure no plugins exited
-    for plugin in plugins {
-        plugin?;
+        Ok(())
     }
-
-    Ok(())
 }
 
 #[derive(Clone, Debug)]
 pub struct Context {
-    pub msg: irc::Message,
+    pub raw_event: SeabirdEvent,
 
-    sender: mpsc::Sender<String>,
-    client_state: Arc<ClientState>,
-
-    db_client: Arc<tokio_postgres::Client>,
+    client: Arc<Client>,
 }
 
 impl Context {
-    fn new(
-        client_state: Arc<ClientState>,
-        msg: irc::Message,
-        sender: mpsc::Sender<String>,
-        db_client: Arc<tokio_postgres::Client>,
-    ) -> Self {
-        Context {
-            client_state,
-            msg,
-            sender,
-            db_client,
-        }
+    fn new(client: Arc<Client>, raw_event: SeabirdEvent) -> Self {
+        Context { raw_event, client }
+    }
+
+    pub fn as_event(&self) -> Event<'_> {
+        (&self.raw_event).into()
     }
 
     pub fn reply_target(&self) -> Option<&str> {
-        match (&self.msg.command[..], self.msg.params.len()) {
-            // If the first param is not the current nick, we need to respond to
-            // the target, otherwise the prefix's nick.
-            ("PRIVMSG", 2) => {
-                if self.msg.params[0] != self.client_state.current_nick[..] {
-                    Some(&self.msg.params[0][..])
-                } else {
-                    self.msg.prefix.as_ref().map(|p| &p.nick[..])
-                }
-            }
-            _ => None,
+        match &self.raw_event {
+            SeabirdEvent::Message(message) => Some(message.reply_to.as_str()),
+            SeabirdEvent::PrivateMessage(message) => Some(message.reply_to.as_str()),
+            SeabirdEvent::Command(message) => Some(message.reply_to.as_str()),
+            SeabirdEvent::Mention(message) => Some(message.reply_to.as_str()),
         }
     }
 
     pub fn sender(&self) -> Option<&str> {
-        match (&self.msg.command[..], self.msg.params.len()) {
-            // Only return the prefix if it came from a valid message.
-            ("PRIVMSG", 2) => self.msg.prefix.as_ref().map(|p| &p.nick[..]),
-            _ => None,
+        match &self.raw_event {
+            SeabirdEvent::Message(message) => Some(message.sender.as_str()),
+            SeabirdEvent::PrivateMessage(message) => Some(message.sender.as_str()),
+            SeabirdEvent::Command(message) => Some(message.sender.as_str()),
+            SeabirdEvent::Mention(message) => Some(message.sender.as_str()),
         }
     }
 
@@ -361,48 +240,29 @@ impl Context {
 
         // If the target matches the sender, it's a privmsg so we shouldn't send
         // a prefix.
+        //
+        // TODO: switch to matching on PrivateMessage
         if target == sender {
-            self.send("PRIVMSG", vec![target, msg]).await
+            self.reply(msg).await
         } else {
-            self.send("PRIVMSG", vec![target, &format!("{}: {}", sender, msg)[..]])
-                .await
+            self.reply(&format!("{}: {}", sender, msg)[..]).await
         }
     }
 
     pub async fn reply(&self, msg: &str) -> Result<()> {
-        self.send(
-            "PRIVMSG",
-            vec![
-                self.reply_target()
-                    .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?,
-                msg,
-            ],
+        self.send_message(
+            self.reply_target()
+                .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?,
+            msg,
         )
         .await
     }
 
-    pub async fn send(&self, command: &str, params: Vec<&str>) -> Result<()> {
-        self.send_msg(&irc::Message::new(
-            command.to_string(),
-            params.into_iter().map(|s| s.to_string()).collect(),
-        ))
-        .await
-    }
-
-    pub async fn send_msg(&self, msg: &irc::Message) -> Result<()> {
-        self.sender.clone().send(msg.to_string()).await?;
-        Ok(())
-    }
-
-    pub fn command_prefix(&self) -> &str {
-        &self.client_state.config.command_prefix
-    }
-
-    pub fn as_event(&self) -> Event<'_> {
-        Event::from_message(self.client_state.clone(), &self.msg)
+    pub async fn send_message(&self, target: &str, message: &str) -> Result<()> {
+        self.client.send_message(target, message).await
     }
 
     pub fn get_db(&self) -> Arc<tokio_postgres::Client> {
-        self.db_client.clone()
+        self.client.db_client.clone()
     }
 }

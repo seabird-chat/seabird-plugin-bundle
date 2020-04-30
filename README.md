@@ -9,21 +9,13 @@
 
 Settings can either be included as a part of the environment or in a .env file.
 
-- `SEABIRD_HOST` - host/port to connect to
-- `SEABIRD_NICK` - bot nick
-- `SEABIRD_USER` - defaults to the `SEABIRD_NICK`
-- `SEABIRD_NAME` - defaults to the `SEABIRD_USER`
-- `SEABIRD_PASS` - optional server password
+- `SEABIRD_URL`
+- `SEABIRD_TOKEN`
 - `DATABASE_URL` - connection string for the database - can either be in connection string or url format
-- `SEABIRD_COMMAND_PREFIX` - defaults to `!` - multi-character strings can be used
 - `SEABIRD_ENABLED_PLUGINS` - comma-separated list of enabled plugins - if this is empty, all plugins will be loaded
 - `SEABIRD_DISABLED_PLUGINS` - comma-separated list of plugins that should not be enabled
 - `DARKSKY_API_KEY` - needed for forecast/weather support
-- `GOOGLE_MAPS_API_KEY` - needed for forecast/weather support
-- `MINECRAFT_TOPIC_UPDATE_ENABLED` - allow the Minecraft plugin to update a channel's topic with server information
-- `MINECRAFT_TOPIC_UPDATE_HOSTPORT` - `hostname[:port]` for the Minecraft plugin topic updater to use
-- `MINECRAFT_TOPIC_UPDATE_CHANNEL` - `#some-channel` IRC channel for the Minecraft plugin topic updater to update
-- `MINECRAFT_TOPIC_UPDATE_INTERVAL_SECONDS` - The number of seconds in between each topic update. Defaults to 60 seconds.
+- `OPENWEATHERMAP_API_KEY` - needed for forecast/weather support
 
 ## Writing a new plugin
 

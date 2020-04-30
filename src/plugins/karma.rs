@@ -109,11 +109,11 @@ impl Plugin for KarmaPlugin {
         Ok(KarmaPlugin::new())
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("karma", Some(arg)) => self.handle_karma(&ctx, arg).await,
-                Event::Privmsg(_, msg) => self.handle_privmsg(&ctx, msg).await,
+                Event::Message(_, msg) => self.handle_privmsg(&ctx, msg).await,
                 _ => Ok(()),
             };
 
