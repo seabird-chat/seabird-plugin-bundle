@@ -1,4 +1,4 @@
-FROM rust:1.42 as builder
+FROM rust:1.43 as builder
 WORKDIR /usr/src/seabird-rs
 
 # Copy over only the files which specify dependencies
