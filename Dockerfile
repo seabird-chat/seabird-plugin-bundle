@@ -1,6 +1,10 @@
 FROM rust:1.43 as builder
 WORKDIR /usr/src/seabird-rs
 
+# NOTE: tonic_build uses rustfmt to properly format the output files and give
+# better errors.
+RUN rustup component add rustfmt
+
 # Copy over only the files which specify dependencies
 COPY Cargo.toml Cargo.lock ./
 
