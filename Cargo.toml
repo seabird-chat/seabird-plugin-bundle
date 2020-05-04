@@ -8,19 +8,15 @@ edition = "2018"
 # Core dependencies
 anyhow = "1.0"
 async-trait = "0.1"
-atty = "0.2"
 bytes = "0.5"
 dotenv = "0.15"
 futures = "0.3"
-irc = { package = "simple-irc", version = "0.3.1" }
 log = "0.4"
-native-tls = "0.2"
-pin-project = "0.4"
-pretty_env_logger = "0.4"
-thiserror = "1.0"
-tokio = { version = "0.2", features = ["macros", "tcp", "rt-core", "rt-threaded", "stream", "sync", "time"] }
-tokio-tls = "0.3"
 maplit = "1.0"
+pretty_env_logger = "0.4"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros", "rt-core", "stream", "sync", "time"] }
+tonic = { version = "0.2", features = ["tls", "tls-roots"] }
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }
@@ -36,10 +32,12 @@ time = "0.2"
 tokio-postgres = "0.5"
 trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns", version = "0.19", features = ["tokio-runtime"] }
 url = "2.1"
-async-minecraft-ping = "0.2"
 git-version = "0.3"
 unicode-segmentation = "1.6"
 
 # In order to get these packages working properly, we need to use the versions
 # from git.
 refinery = { git = "https://github.com/rust-db/refinery", features = ["tokio-postgres"] }
+
+[build-dependencies]
+tonic-build = { version = "0.2", features = ["prost"] }

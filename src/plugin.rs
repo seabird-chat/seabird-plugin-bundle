@@ -1,45 +1,70 @@
 use std::collections::BTreeSet;
 
 use maplit::btreeset;
-use tokio::sync::mpsc;
-
-use crate::prelude::*;
+use tokio::sync::broadcast;
 
 use crate::plugins;
-
-const PLUGIN_MESSAGE_BUF: usize = 100;
-
+use crate::prelude::*;
 #[async_trait]
 pub trait Plugin {
     fn new_from_env() -> Result<Self>
     where
         Self: Sized;
 
-    async fn run(self, bot: Arc<Client>, stream: Receiver<Arc<Context>>) -> Result<()>;
+    async fn run(self, bot: Arc<Client>, stream: EventStream) -> Result<()>;
 }
 
-// TODO: this should be a struct type rather than a tuple, but it's so much more
-// convenient to just unzip it on the other end for now.
-type PluginMeta = (
-    tokio::sync::mpsc::Sender<Arc<Context>>,
-    tokio::task::JoinHandle<Result<()>>,
-);
+pub struct EventStream(Option<broadcast::Receiver<Arc<Context>>>);
 
-fn start_plugin<P>(bot: &Arc<Client>) -> Result<PluginMeta>
+impl Stream for EventStream {
+    type Item = Arc<Context>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        use std::task::Poll;
+
+        let inner = &mut self.0;
+
+        if let Some(poller) = inner {
+            // NOTE: we need to use this undocumented method or it'll never be
+            // woken up.
+            match poller.poll_recv(cx) {
+                Poll::Ready(Err(_)) => {
+                    // If the stream is done, drop the inner receiver and return
+                    // a finalized stream.
+                    inner.take();
+                    Poll::Ready(None)
+                }
+                Poll::Ready(Ok(item)) => Poll::Ready(Some(item)),
+                Poll::Pending => Poll::Pending,
+            }
+        } else {
+            Poll::Ready(None)
+        }
+    }
+}
+
+pub type PluginHandle = tokio::task::JoinHandle<Result<()>>;
+
+fn start_plugin<P>(bot: &Arc<Client>) -> Result<PluginHandle>
 where
     P: Plugin + Send + 'static,
 {
-    let (sender, receiver) = mpsc::channel(PLUGIN_MESSAGE_BUF);
     let plugin = P::new_from_env()?;
     let bot = bot.clone();
 
-    // TODO: we have a Result getting lost here
-    let handle = tokio::task::spawn(async move { plugin.run(bot, receiver).await });
+    let stream = bot.subscribe();
 
-    Ok((sender, handle))
+    // TODO: we have a Result getting lost here
+    let handle =
+        tokio::task::spawn(async move { plugin.run(bot, EventStream(Some(stream))).await });
+
+    Ok(handle)
 }
 
-pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMeta>> {
+pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginHandle>> {
     let supported_plugins = btreeset![
         "forecast",
         "karma",
@@ -51,9 +76,7 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMeta>> {
         "url",
     ];
 
-    // This is technically awaiting on a mutex, but at the point load is called,
-    // it's impossible for anything else to have locked the mutex.
-    let config = &bot.current_state().await.config;
+    let config = bot.get_config();
 
     // Check that all of the provided plugins are supported
     let mut unknown_plugins = Vec::new();
@@ -110,10 +133,6 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMeta>> {
 
     if config.plugin_enabled("karma") {
         ret.push(start_plugin::<plugins::KarmaPlugin>(&bot)?);
-    }
-
-    if config.plugin_enabled("minecraft") {
-        ret.push(start_plugin::<plugins::MinecraftPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("mention") {

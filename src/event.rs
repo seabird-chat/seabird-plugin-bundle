@@ -3,17 +3,8 @@ use crate::prelude::*;
 #[non_exhaustive]
 pub enum Event<'a> {
     // PRIVMSG target :msg
-    Privmsg(&'a str, &'a str),
-
-    // 001 nick :welcome text
-    RplWelcome(&'a str, &'a str),
-
-    // 332 nick #channel :topic
-    RplTopic {
-        nick: &'a str,
-        channel: &'a str,
-        topic: &'a str,
-    },
+    Message(&'a str, &'a str),
+    PrivateMessage(&'a str, &'a str),
 
     // PRIVMSG somewhere :!command arg
     Command(&'a str, Option<&'a str>),
@@ -21,39 +12,29 @@ pub enum Event<'a> {
     // PRIVMSG somewhere :seabird: arg
     Mention(&'a str),
 
-    // If it didn't match anything else, it falls back to Raw.
-    Raw(&'a str, Vec<&'a str>),
+    Unknown(&'a SeabirdEvent),
 }
 
-impl<'a> Event<'a> {
-    pub fn from_message(state: Arc<ClientState>, msg: &'a irc::Message) -> Self {
-        match (&msg.command[..], msg.params.len()) {
-            ("PRIVMSG", 2) => {
-                let message = &msg.params[1][..];
-                if message.starts_with(&state.config.command_prefix) {
-                    let mut parts = message[state.config.command_prefix.len()..].splitn(2, ' ');
-                    let cmd = parts.next().unwrap_or("");
-                    let arg = parts.next().unwrap_or("").trim();
-                    Event::Command(cmd, if arg.is_empty() { None } else { Some(arg) })
-                } else if message.starts_with(&state.current_nick)
-                    && message[state.current_nick.len()..].starts_with(':')
-                {
-                    let arg = &message[state.current_nick.len() + 1..].trim();
-                    Event::Mention(arg)
-                } else {
-                    Event::Privmsg(&msg.params[0][..], message)
-                }
+impl<'a> From<&'a SeabirdEvent> for Event<'a> {
+    fn from(event: &'a SeabirdEvent) -> Self {
+        match event {
+            SeabirdEvent::Message(msg) => {
+                Event::Message(msg.reply_to.as_str(), msg.message.as_str())
             }
-            ("001", 2) => Event::RplWelcome(&msg.params[0][..], &msg.params[1][..]),
-            ("332", 3) => Event::RplTopic {
-                nick: &msg.params[0][..],
-                channel: &msg.params[1][..],
-                topic: &msg.params[2][..],
-            },
-            _ => Event::Raw(
-                &msg.command[..],
-                msg.params.iter().map(|s| s.as_str()).collect(),
-            ),
+            SeabirdEvent::PrivateMessage(msg) => {
+                Event::PrivateMessage(msg.reply_to.as_str(), msg.message.as_str())
+            }
+            SeabirdEvent::Command(msg) => {
+                let inner = msg.arg.trim();
+                Event::Command(
+                    msg.command.as_str(),
+                    if inner.is_empty() { None } else { Some(inner) },
+                )
+            }
+            SeabirdEvent::Mention(msg) => Event::Mention(msg.message.as_str()),
+
+            #[allow(unreachable_patterns)]
+            event => Event::Unknown(event),
         }
     }
 }

@@ -145,11 +145,7 @@ impl NoaaPlugin {
                 self.lookup_metar(ctx, station).await?;
             }
             None => {
-                ctx.mention_reply(&format!(
-                    "Missing station argument. Usage: {}metar <station>",
-                    ctx.command_prefix()
-                ))
-                .await?;
+                ctx.mention_reply("Missing station argument.").await?;
             }
         }
 
@@ -162,11 +158,7 @@ impl NoaaPlugin {
                 self.lookup_taf(ctx, station).await?;
             }
             None => {
-                ctx.mention_reply(&format!(
-                    "Missing station argument. Usage: {}taf <station>",
-                    ctx.command_prefix()
-                ))
-                .await?;
+                ctx.mention_reply("Missing station argument.").await?;
             }
         }
 
@@ -180,7 +172,7 @@ impl Plugin for NoaaPlugin {
         Ok(NoaaPlugin::new())
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("metar", arg) => self.handle_metar(&ctx, arg).await,

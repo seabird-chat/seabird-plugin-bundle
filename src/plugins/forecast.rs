@@ -1,5 +1,3 @@
-use crate::utils::to_sentence_case;
-
 use crate::utils::{maps, openweathermap};
 
 use crate::prelude::*;
@@ -36,11 +34,8 @@ impl ForecastPlugin {
                 .await?;
             }
             LocationStatus::NoLocations => {
-                ctx.mention_reply(&format!(
-                    "Missing location argument or unknown location. Usage: {}weather <station>",
-                    ctx.command_prefix()
-                ))
-                .await?;
+                ctx.mention_reply("Missing location argument or unknown location.")
+                    .await?;
             }
         }
 
@@ -64,11 +59,8 @@ impl ForecastPlugin {
                 .await?;
             }
             LocationStatus::NoLocations => {
-                ctx.mention_reply(&format!(
-                    "Missing location argument or unknown location. Usage: {}forecast <station>",
-                    ctx.command_prefix()
-                ))
-                .await?;
+                ctx.mention_reply("Missing location argument or unknown location.")
+                    .await?;
             }
         }
 
@@ -97,7 +89,7 @@ impl ForecastPlugin {
             res.temperature_high,
             res.temperature_low,
             res.humidity,
-            to_sentence_case(&res.summary),
+            utils::to_sentence_case(&res.summary),
         ))
         .await?;
 
@@ -130,7 +122,7 @@ impl ForecastPlugin {
                 day.temperature_high,
                 day.temperature_low,
                 day.humidity,
-                to_sentence_case(&day.summary),
+                utils::to_sentence_case(&day.summary),
             ))
             .await?;
         }
@@ -252,7 +244,7 @@ impl Plugin for ForecastPlugin {
         ))
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: Receiver<Arc<Context>>) -> Result<()> {
+    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
                 Event::Command("weather", arg) => self.handle_weather(&ctx, arg).await,
