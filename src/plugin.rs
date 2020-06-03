@@ -73,7 +73,6 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginHandle>> {
         "net_tools",
         "noaa",
         "introspection",
-        "url",
     ];
 
     let config = bot.get_config();
@@ -149,10 +148,6 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginHandle>> {
 
     if config.plugin_enabled("introspection") {
         ret.push(start_plugin::<plugins::IntrospectionPlugin>(&bot)?);
-    }
-
-    if config.plugin_enabled("url") {
-        ret.push(start_plugin::<plugins::UrlPlugin>(&bot)?);
     }
 
     Ok(ret)
