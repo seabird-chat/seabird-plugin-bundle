@@ -109,6 +109,14 @@ impl Plugin for KarmaPlugin {
         Ok(KarmaPlugin::new())
     }
 
+    fn command_metadata(&self) -> Vec<CommandMetadata> {
+        vec![CommandMetadata {
+            name: "karma".to_string(),
+            short_help: "".to_string(),
+            full_help: "".to_string(),
+        }]
+    }
+
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {

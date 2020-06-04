@@ -26,6 +26,14 @@ impl Plugin for IntrospectionPlugin {
         Ok(IntrospectionPlugin::new())
     }
 
+    fn command_metadata(&self) -> Vec<CommandMetadata> {
+        vec![CommandMetadata {
+            name: "uptime".to_string(),
+            short_help: "".to_string(),
+            full_help: "".to_string(),
+        }]
+    }
+
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             match ctx.as_event() {

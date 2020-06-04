@@ -144,14 +144,17 @@ impl Client {
         })
     }
 
-    async fn reader_task(self: &Arc<Self>) -> Result<()> {
+    async fn reader_task(
+        self: &Arc<Self>,
+        commands: HashMap<String, crate::plugin::CommandMetadata>,
+    ) -> Result<()> {
         let mut stream = self
             .inner
             .lock()
             .await
             .stream_events(proto::StreamEventsRequest {
                 identity: self.identity.clone(),
-                commands: HashMap::new(),
+                commands,
             })
             .await?
             .into_inner();
@@ -180,10 +183,25 @@ impl Client {
 
         // TODO: it's unfortunately easiest to load plugins in run, even though
         // it would make more sense in new().
-        let plugin_tasks = crate::plugin::load(client.clone()).await?;
+        let plugin_meta = crate::plugin::load(client.clone()).await?;
+
+        let mut plugin_tasks = Vec::new();
+        let mut plugin_commands = HashMap::new();
+
+        for meta in plugin_meta.into_iter() {
+            plugin_tasks.push(meta.handle);
+
+            for command in meta.commands.into_iter() {
+                if plugin_commands.contains_key(&command.name) {
+                    anyhow::bail!("Duplicate commands defined with the name {}", command.name);
+                }
+
+                plugin_commands.insert(command.name.clone(), command);
+            }
+        }
 
         let (_client, plugins) = tokio::try_join!(
-            client.reader_task(),
+            client.reader_task(plugin_commands),
             try_join_all(plugin_tasks).map_err(|e| e.into()),
         )?;
 

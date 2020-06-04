@@ -244,6 +244,21 @@ impl Plugin for ForecastPlugin {
         ))
     }
 
+    fn command_metadata(&self) -> Vec<CommandMetadata> {
+        vec![
+            CommandMetadata {
+                name: "weather".to_string(),
+                short_help: "".to_string(),
+                full_help: "".to_string(),
+            },
+            CommandMetadata {
+                name: "forecast".to_string(),
+                short_help: "".to_string(),
+                full_help: "".to_string(),
+            },
+        ]
+    }
+
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {

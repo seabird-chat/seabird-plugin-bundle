@@ -172,6 +172,21 @@ impl Plugin for NoaaPlugin {
         Ok(NoaaPlugin::new())
     }
 
+    fn command_metadata(&self) -> Vec<CommandMetadata> {
+        vec![
+            CommandMetadata {
+                name: "metar".to_string(),
+                short_help: "".to_string(),
+                full_help: "".to_string(),
+            },
+            CommandMetadata {
+                name: "taf".to_string(),
+                short_help: "".to_string(),
+                full_help: "".to_string(),
+            },
+        ]
+    }
+
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {

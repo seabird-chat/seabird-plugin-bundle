@@ -11,6 +11,10 @@ pub trait Plugin {
     where
         Self: Sized;
 
+    fn command_metadata(&self) -> Vec<CommandMetadata> {
+        Vec::new()
+    }
+
     async fn run(self, bot: Arc<Client>, stream: EventStream) -> Result<()>;
 }
 
@@ -46,13 +50,22 @@ impl Stream for EventStream {
     }
 }
 
+pub type CommandMetadata = crate::proto::CommandMetadata;
+
 pub type PluginHandle = tokio::task::JoinHandle<Result<()>>;
 
-fn start_plugin<P>(bot: &Arc<Client>) -> Result<PluginHandle>
+#[derive(Debug)]
+pub struct PluginMetadata {
+    pub handle: PluginHandle,
+    pub commands: Vec<CommandMetadata>,
+}
+
+fn start_plugin<P>(bot: &Arc<Client>) -> Result<PluginMetadata>
 where
     P: Plugin + Send + 'static,
 {
     let plugin = P::new_from_env()?;
+    let commands = plugin.command_metadata();
     let bot = bot.clone();
 
     let stream = bot.subscribe();
@@ -61,10 +74,13 @@ where
     let handle =
         tokio::task::spawn(async move { plugin.run(bot, EventStream(Some(stream))).await });
 
-    Ok(handle)
+    Ok(PluginMetadata {
+        handle,
+        commands,
+    })
 }
 
-pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginHandle>> {
+pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
     let supported_plugins = btreeset![
         "forecast",
         "karma",
