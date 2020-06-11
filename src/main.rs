@@ -60,8 +60,8 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = client::ClientConfig::new(
-        dotenv::var("SEABIRD_URL")
-            .context("Missing $SEABIRD_URL. You must specify a Seabird host.")?,
+        dotenv::var("SEABIRD_HOST")
+            .context("Missing $SEABIRD_HOST. You must specify a Seabird host.")?,
         dotenv::var("SEABIRD_TOKEN")
             .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
         dotenv::var("DATABASE_URL")
