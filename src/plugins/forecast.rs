@@ -239,7 +239,7 @@ impl Plugin for ForecastPlugin {
                 )
             })?,
             dotenv::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
-                anyhow::format_err!("Missing $MAPS_API_KEY. Required by the \"forecast\" plugin.")
+                anyhow::format_err!("Missing $GOOGLE_MAPS_API_KEY. Required by the \"forecast\" plugin.")
             })?,
         ))
     }
@@ -262,8 +262,8 @@ impl Plugin for ForecastPlugin {
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
-                Event::Command("weather", arg) => self.handle_weather(&ctx, arg).await,
-                Event::Command("forecast", arg) => self.handle_forecast(&ctx, arg).await,
+                Ok(Event::Command("weather", arg)) => self.handle_weather(&ctx, arg).await,
+                Ok(Event::Command("forecast", arg)) => self.handle_forecast(&ctx, arg).await,
                 _ => Ok(()),
             };
 

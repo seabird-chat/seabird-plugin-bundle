@@ -157,8 +157,8 @@ impl Plugin for NetToolsPlugin {
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
-                Event::Command("dig", Some(arg)) => self.handle_dig(&ctx, arg).await,
-                Event::Command("dig", None) => Err(anyhow::format_err!("Not enough arguments")),
+                Ok(Event::Command("dig", Some(arg))) => self.handle_dig(&ctx, arg).await,
+                Ok(Event::Command("dig", None)) => Err(anyhow::format_err!("Not enough arguments")),
                 _ => Ok(()),
             };
 

@@ -1,14 +1,18 @@
 use std::collections::BTreeSet;
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use futures::future::{try_join_all, TryFutureExt};
 use http::Uri;
 use tokio::stream::StreamExt;
 use tokio::sync::{broadcast, Mutex};
-use tonic::transport::{Channel, ClientTlsConfig};
+use tonic::{
+    metadata::{Ascii, MetadataValue},
+    transport::{Channel, ClientTlsConfig},
+};
 
 use crate::prelude::*;
-use crate::proto::seabird_client::SeabirdClient;
+use crate::proto::seabird::seabird_client::SeabirdClient;
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
@@ -62,21 +66,31 @@ impl ClientConfig {
 #[derive(Debug)]
 pub struct Client {
     config: ClientConfig,
-    identity: Option<proto::Identity>,
     inner: Mutex<SeabirdClient<tonic::transport::Channel>>,
     db_client: Arc<tokio_postgres::Client>,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
 
 impl Client {
-    pub async fn send_message(&self, target: &str, message: &str) -> Result<()> {
+    pub async fn send_message(&self, channel_id: &str, text: &str) -> Result<()> {
         self.inner
             .lock()
             .await
             .send_message(proto::SendMessageRequest {
-                identity: self.identity.clone(),
-                target: target.to_string(),
-                message: message.to_string(),
+                channel_id: channel_id.to_string(),
+                text: text.to_string(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn send_private_message(&self, user_id: &str, text: &str) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .send_private_message(proto::SendPrivateMessageRequest {
+                user_id: user_id.to_string(),
+                text: text.to_string(),
             })
             .await?;
         Ok(())
@@ -110,10 +124,6 @@ impl Client {
             .run_async(&mut db_client)
             .await?;
 
-        let identity = Some(proto::Identity {
-            auth_method: Some(proto::identity::AuthMethod::Token(config.token.clone())),
-        });
-
         let uri: Uri = config.url.parse().context("failed to parse SEABIRD_URL")?;
         let mut channel_builder = Channel::builder(uri.clone());
 
@@ -131,13 +141,19 @@ impl Client {
             .await
             .context("Failed to connect to seabird")?;
 
-        let seabird_client = crate::proto::seabird_client::SeabirdClient::new(channel);
+        let auth_header: MetadataValue<Ascii> = format!("Bearer {}", config.token).parse()?;
+
+        let seabird_client =
+            SeabirdClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
+                req.metadata_mut()
+                    .insert("authorization", auth_header.clone());
+                Ok(req)
+            });
 
         let (sender, _) = broadcast::channel(100);
 
         Ok(Client {
             config,
-            identity,
             broadcast: sender,
             db_client: Arc::new(db_client),
             inner: Mutex::new(seabird_client),
@@ -152,10 +168,7 @@ impl Client {
             .inner
             .lock()
             .await
-            .stream_events(proto::StreamEventsRequest {
-                identity: self.identity.clone(),
-                commands,
-            })
+            .stream_events(proto::StreamEventsRequest { commands })
             .await?
             .into_inner();
 
@@ -226,25 +239,37 @@ impl Context {
         Context { raw_event, client }
     }
 
-    pub fn as_event(&self) -> Event<'_> {
-        (&self.raw_event).into()
+    pub fn as_event(&self) -> Result<Event<'_>> {
+        self.try_into()
     }
 
-    pub fn reply_target(&self) -> Option<&str> {
-        match &self.raw_event {
-            SeabirdEvent::Message(message) => Some(message.reply_to.as_str()),
-            SeabirdEvent::PrivateMessage(message) => Some(message.reply_to.as_str()),
-            SeabirdEvent::Command(message) => Some(message.reply_to.as_str()),
-            SeabirdEvent::Mention(message) => Some(message.reply_to.as_str()),
+    pub fn is_private(&self) -> bool {
+        if let SeabirdEvent::PrivateMessage(_) = self.raw_event {
+            return true;
+        } else {
+            return false;
         }
     }
 
     pub fn sender(&self) -> Option<&str> {
         match &self.raw_event {
-            SeabirdEvent::Message(message) => Some(message.sender.as_str()),
-            SeabirdEvent::PrivateMessage(message) => Some(message.sender.as_str()),
-            SeabirdEvent::Command(message) => Some(message.sender.as_str()),
-            SeabirdEvent::Mention(message) => Some(message.sender.as_str()),
+            SeabirdEvent::Message(message) => message
+                .source
+                .as_ref()
+                .and_then(|s| s.user.as_ref().map(|u| u.display_name.as_str())),
+            SeabirdEvent::Command(message) => message
+                .source
+                .as_ref()
+                .and_then(|s| s.user.as_ref().map(|u| u.display_name.as_str())),
+            SeabirdEvent::Mention(message) => message
+                .source
+                .as_ref()
+                .and_then(|s| s.user.as_ref().map(|u| u.display_name.as_str())),
+
+            // NOTE: PrivateMessage is in a different format
+            SeabirdEvent::PrivateMessage(message) => {
+                message.source.as_ref().map(|u| u.display_name.as_str())
+            }
         }
     }
 
@@ -252,35 +277,114 @@ impl Context {
         let sender = self
             .sender()
             .ok_or_else(|| format_err!("Tried to get the sender of an event without one"))?;
-        let target = self
-            .reply_target()
-            .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?;
 
-        // If the target matches the sender, it's a privmsg so we shouldn't send
-        // a prefix.
-        //
-        // TODO: switch to matching on PrivateMessage
-        if target == sender {
+        // If it's a private message, we shouldn't send the prefix.
+        if self.is_private() {
             self.reply(msg).await
         } else {
             self.reply(&format!("{}: {}", sender, msg)[..]).await
         }
     }
 
-    pub async fn reply(&self, msg: &str) -> Result<()> {
-        self.send_message(
-            self.reply_target()
-                .ok_or_else(|| format_err!("Tried to reply to an event without a targets"))?,
-            msg,
-        )
-        .await
-    }
-
-    pub async fn send_message(&self, target: &str, message: &str) -> Result<()> {
-        self.client.send_message(target, message).await
+    pub async fn reply(&self, text: &str) -> Result<()> {
+        match &self.raw_event {
+            SeabirdEvent::Message(message) => {
+                self.client
+                    .send_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::Command(message) => {
+                self.client
+                    .send_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::Mention(message) => {
+                self.client
+                    .send_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::PrivateMessage(message) => {
+                self.client
+                    .send_private_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|u| u.id.as_str())
+                            .ok_or_else(|| format_err!("message missing user_id"))?,
+                        text,
+                    )
+                    .await
+            }
+        }
     }
 
     pub fn get_db(&self) -> Arc<tokio_postgres::Client> {
         self.client.db_client.clone()
+    }
+}
+
+#[non_exhaustive]
+pub enum Event<'a> {
+    // PRIVMSG target :msg
+    Message(&'a str, &'a str),
+    PrivateMessage(&'a str, &'a str),
+
+    // PRIVMSG somewhere :!command arg
+    Command(&'a str, Option<&'a str>),
+
+    // PRIVMSG somewhere :seabird: arg
+    Mention(&'a str),
+
+    Unknown(&'a SeabirdEvent),
+}
+
+impl<'a> TryFrom<&'a Context> for Event<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(ctx: &'a Context) -> Result<Self> {
+        Ok(match &ctx.raw_event {
+            SeabirdEvent::Message(msg) => Event::Message(
+                ctx.sender()
+                    .ok_or_else(|| format_err!("event missing sender"))?,
+                msg.text.as_str(),
+            ),
+            SeabirdEvent::PrivateMessage(msg) => Event::PrivateMessage(
+                ctx.sender()
+                    .ok_or_else(|| format_err!("event missing sender"))?,
+                msg.text.as_str(),
+            ),
+            SeabirdEvent::Command(msg) => {
+                let inner = msg.arg.trim();
+                Event::Command(
+                    msg.command.as_str(),
+                    if inner.is_empty() { None } else { Some(inner) },
+                )
+            }
+            SeabirdEvent::Mention(msg) => Event::Mention(msg.text.as_str()),
+
+            #[allow(unreachable_patterns)]
+            event => Event::Unknown(event),
+        })
     }
 }
