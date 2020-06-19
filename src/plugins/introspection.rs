@@ -37,7 +37,7 @@ impl Plugin for IntrospectionPlugin {
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             match ctx.as_event() {
-                Event::Command("uptime", _) => {
+                Ok(Event::Command("uptime", _)) => {
                     let elapsed = self.started.elapsed();
 
                     let days = elapsed.whole_days();
@@ -54,7 +54,7 @@ impl Plugin for IntrospectionPlugin {
 
                     ctx.mention_reply(&ret[..]).await?;
                 }
-                Event::Command("version", _) => {
+                Ok(Event::Command("version", _)) => {
                     ctx.mention_reply(&format!("seabird {}-{}", SEABIRD_VERSION, GIT_VERSION))
                         .await?;
                 }

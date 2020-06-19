@@ -7,7 +7,6 @@ extern crate log;
 
 mod client;
 mod error;
-mod event;
 mod migrations;
 mod plugin;
 mod plugins;
@@ -15,20 +14,26 @@ mod prelude;
 pub(crate) mod utils;
 
 pub mod proto {
-    tonic::include_proto!("seabird");
+    pub mod common {
+        tonic::include_proto!("common");
+    }
+    pub mod seabird {
+        tonic::include_proto!("seabird");
+    }
+
+    pub use self::common::*;
+    pub use self::seabird::*;
 }
 
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
-        if ctx.reply_target().is_some() {
-            let inner = ctx
-                .mention_reply(&format!("unexpected error: {}", err))
-                .await;
-            if let Err(inner) = inner {
-                error!("unexpected error ({}) while handling: {}", inner, err);
-            }
-        } else {
-            error!("unexpected error: {}", err);
+        error!("unexpected error: {}", err);
+
+        let inner = ctx
+            .mention_reply(&format!("unexpected error: {}", err))
+            .await;
+        if let Err(inner) = inner {
+            error!("unexpected error ({}) while handling: {}", inner, err);
         }
     }
 }
@@ -55,8 +60,8 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = client::ClientConfig::new(
-        dotenv::var("SEABIRD_URL")
-            .context("Missing $SEABIRD_URL. You must specify a Seabird host.")?,
+        dotenv::var("SEABIRD_HOST")
+            .context("Missing $SEABIRD_HOST. You must specify a Seabird host.")?,
         dotenv::var("SEABIRD_TOKEN")
             .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
         dotenv::var("DATABASE_URL")

@@ -190,8 +190,8 @@ impl Plugin for NoaaPlugin {
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             let res = match ctx.as_event() {
-                Event::Command("metar", arg) => self.handle_metar(&ctx, arg).await,
-                Event::Command("taf", arg) => self.handle_taf(&ctx, arg).await,
+                Ok(Event::Command("metar", arg)) => self.handle_metar(&ctx, arg).await,
+                Ok(Event::Command("taf", arg)) => self.handle_taf(&ctx, arg).await,
                 _ => Ok(()),
             };
 

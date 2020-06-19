@@ -8,10 +8,9 @@ pub use itertools::Itertools;
 pub use tokio::stream::{Stream, StreamExt};
 pub use unicode_segmentation::UnicodeSegmentation;
 
-pub use crate::client::{Client, ClientConfig, Context};
+pub use crate::client::{Client, ClientConfig, Context, Event};
 pub use crate::error::Result;
-pub use crate::event::Event;
-pub use crate::plugin::{EventStream, Plugin, CommandMetadata};
+pub use crate::plugin::{CommandMetadata, EventStream, Plugin};
 pub use crate::proto;
 pub use crate::proto::event::Inner as SeabirdEvent;
 pub(crate) use crate::utils;

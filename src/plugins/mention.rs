@@ -10,7 +10,7 @@ impl Plugin for MentionPlugin {
 
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
-            if let Event::Mention(msg) = ctx.as_event() {
+            if let Ok(Event::Mention(msg)) = ctx.as_event() {
                 match msg {
                     "ping" => ctx.mention_reply("pong").await?,
                     "scoobysnack" | "scooby snack" => ctx.reply("Scooby Dooby Doo!").await?,
