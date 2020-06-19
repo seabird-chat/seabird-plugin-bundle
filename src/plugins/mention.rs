@@ -11,16 +11,18 @@ impl Plugin for MentionPlugin {
     async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
         while let Some(ctx) = stream.next().await {
             if let Ok(Event::Mention(msg)) = ctx.as_event() {
-                match msg {
-                    "ping" => ctx.mention_reply("pong").await?,
-                    "scoobysnack" | "scooby snack" => ctx.reply("Scooby Dooby Doo!").await?,
-                    "botsnack" | "bot snack" => ctx.reply(":)").await?,
+                let res = match msg {
+                    "ping" => ctx.mention_reply("pong").await,
+                    "scoobysnack" | "scooby snack" => ctx.reply("Scooby Dooby Doo!").await,
+                    "botsnack" | "bot snack" => ctx.reply(":)").await,
                     "pizzahousesnack" => {
                         ctx.reply("HECK YEAHHHHHHHHHHHH OMG I LOVE U THE WORLD IS GREAT")
-                            .await?
+                            .await
                     }
-                    _ => (),
+                    _ => Ok(()),
                 };
+
+                crate::check_err(&ctx, res).await;
             }
         }
 

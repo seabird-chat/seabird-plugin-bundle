@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use futures::future::{try_join_all, TryFutureExt};
+use futures::future::{select_all, FutureExt};
 use http::Uri;
 use tokio::stream::StreamExt;
 use tokio::sync::{broadcast, Mutex};
@@ -213,17 +213,19 @@ impl Client {
             }
         }
 
-        let (_client, plugins) = tokio::try_join!(
-            client.reader_task(plugin_commands),
-            try_join_all(plugin_tasks).map_err(|e| e.into()),
-        )?;
-
-        // Ensure no plugins exited
-        for plugin in plugins {
-            plugin?;
-        }
-
-        Ok(())
+        // There's not a great way to do this... if anything exits, it's
+        // considered an error. If they returned an error, display that,
+        // otherwise, throw a generic error.
+        futures::select!(
+            reader_res = client.reader_task(plugin_commands).fuse() => {
+                reader_res?;
+                anyhow::bail!("Reader task exited early");
+            },
+            (task, _, _) = select_all(plugin_tasks).fuse() => {
+                task??;
+                anyhow::bail!("A plugin task exited early");
+            },
+        );
     }
 }
 
