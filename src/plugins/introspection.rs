@@ -18,7 +18,13 @@ impl IntrospectionPlugin {
 }
 
 const SEABIRD_VERSION: &str = env!("CARGO_PKG_VERSION");
-const GIT_VERSION: &str = git_version!();
+
+// Pull the git hash, but allow us to fall back to the SOURCE_COMMIT variable
+// which is used in automated Docker Hub builds. For some reason Docker Hub
+// doesn't give us access to the full repository, so we have to use this as a
+// fallback. Thankfully, this will fail if the SOURCE_COMMIT variable also isn't
+// defined.
+const GIT_VERSION: &str = git_version!(fallback = env!("SOURCE_COMMIT"),);
 
 #[async_trait]
 impl Plugin for IntrospectionPlugin {
