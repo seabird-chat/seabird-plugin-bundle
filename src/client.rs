@@ -255,6 +255,10 @@ impl Context {
 
     pub fn sender(&self) -> Option<&str> {
         match &self.raw_event {
+            SeabirdEvent::Action(message) => message
+                .source
+                .as_ref()
+                .and_then(|s| s.user.as_ref().map(|u| u.display_name.as_str())),
             SeabirdEvent::Message(message) => message
                 .source
                 .as_ref()
@@ -268,7 +272,10 @@ impl Context {
                 .as_ref()
                 .and_then(|s| s.user.as_ref().map(|u| u.display_name.as_str())),
 
-            // NOTE: PrivateMessage is in a different format
+            // NOTE: PrivateMessage and PrivateAction are in a different format
+            SeabirdEvent::PrivateAction(message) => {
+                message.source.as_ref().map(|u| u.display_name.as_str())
+            }
             SeabirdEvent::PrivateMessage(message) => {
                 message.source.as_ref().map(|u| u.display_name.as_str())
             }
@@ -290,6 +297,18 @@ impl Context {
 
     pub async fn reply(&self, text: &str) -> Result<()> {
         match &self.raw_event {
+            SeabirdEvent::Action(message) => {
+                self.client
+                    .send_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
             SeabirdEvent::Message(message) => {
                 self.client
                     .send_message(
@@ -322,6 +341,18 @@ impl Context {
                             .as_ref()
                             .map(|s| s.channel_id.as_str())
                             .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::PrivateAction(message) => {
+                self.client
+                    .send_private_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|u| u.id.as_str())
+                            .ok_or_else(|| format_err!("message missing user_id"))?,
                         text,
                     )
                     .await
