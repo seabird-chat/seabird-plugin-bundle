@@ -110,7 +110,11 @@ impl NetToolsPlugin {
             // If a record_type was provided, we need to try and
             // convert it.
             (Some(record_type), Some(name)) => resolver
-                .lookup(name, record_type.to_uppercase().parse()?, DnsRequestOptions::default())
+                .lookup(
+                    name,
+                    record_type.to_uppercase().parse()?,
+                    DnsRequestOptions::default(),
+                )
                 .await?
                 .into_iter()
                 .map(display_rdata)

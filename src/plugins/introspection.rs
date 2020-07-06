@@ -24,7 +24,7 @@ const SEABIRD_VERSION: &str = env!("CARGO_PKG_VERSION");
 // doesn't give us access to the full repository, so we have to use this as a
 // fallback. Thankfully, this will fail if the SOURCE_COMMIT variable also isn't
 // defined.
-const GIT_VERSION: &str = git_version!(fallback = env!("SOURCE_COMMIT"),);
+const GIT_VERSION: &str = git_version!();
 
 #[async_trait]
 impl Plugin for IntrospectionPlugin {
@@ -61,7 +61,7 @@ impl Plugin for IntrospectionPlugin {
                     ctx.mention_reply(&ret[..]).await?;
                 }
                 Ok(Event::Command("version", _)) => {
-                    ctx.mention_reply(&format!("seabird {}-{}", SEABIRD_VERSION, GIT_VERSION))
+                    ctx.mention_reply(&format!("seabird-plugin-bundle {}-{}", SEABIRD_VERSION, GIT_VERSION))
                         .await?;
                 }
                 _ => {}

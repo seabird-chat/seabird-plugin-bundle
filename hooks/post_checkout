@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cat ./proto/.git
+
+# There seems to be an issue with docker hub where it messes up this submodule,
+# so we just nuke it. It's just easier this way.
+rm -rf ./proto
+
+# Docker hub does a recursive clone, then checks the branch out, so when a PR
+# adds a submodule (or updates it), it fails.
+git submodule update --init
+
+cat ./proto/.git
