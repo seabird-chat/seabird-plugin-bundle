@@ -1,4 +1,6 @@
+use std::collections::BTreeMap;
 use std::convert::TryInto;
+use std::fmt::Write;
 
 use regex::Regex;
 
@@ -15,7 +17,7 @@ impl Karma {
         name.to_lowercase()
     }
 
-    async fn get_by_name(conn: Arc<tokio_postgres::Client>, name: &str) -> Result<Self> {
+    async fn get_by_name(conn: &tokio_postgres::Client, name: &str) -> Result<Self> {
         let res = conn
             .query_opt("SELECT name, score FROM karma WHERE name=$1;", &[&name])
             .await?;
@@ -34,7 +36,7 @@ impl Karma {
     }
 
     async fn create_or_update(
-        conn: Arc<tokio_postgres::Client>,
+        conn: &tokio_postgres::Client,
         name: &str,
         score: i32,
     ) -> Result<Self> {
@@ -64,7 +66,7 @@ impl KarmaPlugin {
 impl KarmaPlugin {
     async fn handle_karma(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
         let name = Karma::sanitize_name(arg);
-        let karma = Karma::get_by_name(ctx.get_db(), &name).await?;
+        let karma = Karma::get_by_name(&ctx.get_db(), &name).await?;
 
         ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
             .await?;
@@ -76,6 +78,9 @@ impl KarmaPlugin {
         let captures: Vec<_> = self.re.captures_iter(msg).collect();
 
         if !captures.is_empty() {
+            let mut changes = BTreeMap::new();
+
+            // Loop through all captures, adding them to the output.
             for capture in captures {
                 let mut name = &capture[1];
 
@@ -92,11 +97,33 @@ impl KarmaPlugin {
                 }
 
                 let cleaned_name = Karma::sanitize_name(name);
-                let karma = Karma::create_or_update(ctx.get_db(), &cleaned_name, change).await?;
-
-                ctx.reply(&format!("{}'s karma is now {}", name, karma.score))
-                    .await?;
+                *changes.entry(cleaned_name).or_insert(0) += change;
             }
+
+            let mut first = true;
+            let mut out = String::new();
+
+            let db = ctx.get_db();
+
+            for (name, raw_change) in changes.into_iter() {
+                let change = utils::clamp(raw_change, -5, 5);
+
+                let karma = Karma::create_or_update(&db, &name, change).await?;
+                if first {
+                    first = false;
+                } else {
+                    out.push_str(", ");
+                }
+
+                write!(out, "{}'s karma is now {}", name, karma.score)?;
+
+                if raw_change != change {
+                    out.push_str(" Buzzkill Mode (tm) enforced a limit of 5");
+                }
+            }
+
+            // Send the bulk message
+            ctx.reply(&out).await?;
         }
 
         Ok(())

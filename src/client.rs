@@ -130,8 +130,7 @@ impl Client {
         match uri.scheme_str() {
             None | Some("https") => {
                 println!("Enabling tls");
-                channel_builder = channel_builder
-                    .tls_config(ClientTlsConfig::new().domain_name(uri.host().unwrap()));
+                channel_builder = channel_builder.tls_config(ClientTlsConfig::new());
             }
             _ => {}
         }
