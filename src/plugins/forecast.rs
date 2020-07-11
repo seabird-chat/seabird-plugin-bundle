@@ -72,7 +72,7 @@ impl ForecastPlugin {
 
         // Only set the station if a request was successful.
         ForecastLocation::set_for_name(
-            ctx.get_db(),
+            &ctx.get_db(),
             ctx.sender()
                 .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &location.address[..],
@@ -101,7 +101,7 @@ impl ForecastPlugin {
 
         // Only set the station if a request was successful.
         ForecastLocation::set_for_name(
-            ctx.get_db(),
+            &ctx.get_db(),
             ctx.sender()
                 .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &location.address[..],
@@ -161,7 +161,7 @@ impl ForecastPlugin {
                     ),
                 })
             }
-            None => Ok(ForecastLocation::get_by_name(ctx.get_db(), sender)
+            None => Ok(ForecastLocation::get_by_name(&ctx.get_db(), sender)
                 .await?
                 .map_or(LocationStatus::NoLocations, |loc| {
                     LocationStatus::SingleLocation(loc)
@@ -195,34 +195,33 @@ impl ForecastLocation {
         }
     }
 
-    async fn get_by_name(conn: Arc<tokio_postgres::Client>, nick: &str) -> Result<Option<Self>> {
-        Ok(conn
-            .query_opt(
-                "SELECT nick, address, lat, lng FROM forecast_location WHERE nick=$1;",
-                &[&nick],
-            )
-            .await?
-            .map(|row| ForecastLocation {
-                nick: row.get(0),
-                address: row.get(1),
-                lat: row.get(2),
-                lng: row.get(3),
-            }))
+    async fn get_by_name(conn: &sqlx::PgPool, nick: &str) -> Result<Option<Self>> {
+        Ok(sqlx::query_as!(
+            ForecastLocation,
+            "SELECT nick, address, lat, lng FROM forecast_location WHERE nick=$1;",
+            nick,
+        )
+        .fetch_optional(conn)
+        .await?)
     }
 
     async fn set_for_name(
-        conn: Arc<tokio_postgres::Client>,
+        conn: &sqlx::PgPool,
         nick: &str,
         address: &str,
         lat: f64,
         lng: f64,
     ) -> Result<()> {
-        conn.execute(
+        sqlx::query!(
             "INSERT INTO forecast_location (nick, address, lat, lng) VALUES ($1, $2, $3, $4)
 ON CONFLICT (nick) DO
 UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
-            &[&nick, &address, &lat, &lng],
+            nick,
+            address,
+            lat,
+            lng,
         )
+        .execute(conn)
         .await?;
 
         Ok(())
@@ -239,7 +238,9 @@ impl Plugin for ForecastPlugin {
                 )
             })?,
             dotenv::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
-                anyhow::format_err!("Missing $GOOGLE_MAPS_API_KEY. Required by the \"forecast\" plugin.")
+                anyhow::format_err!(
+                    "Missing $GOOGLE_MAPS_API_KEY. Required by the \"forecast\" plugin."
+                )
             })?,
         ))
     }

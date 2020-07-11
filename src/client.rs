@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
 use http::Uri;
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use tokio::stream::StreamExt;
 use tokio::sync::{broadcast, Mutex};
 use tonic::{
@@ -67,6 +68,7 @@ impl ClientConfig {
 pub struct Client {
     config: ClientConfig,
     inner: Mutex<SeabirdClient<tonic::transport::Channel>>,
+    db_pool: sqlx::PgPool,
     db_client: Arc<tokio_postgres::Client>,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
@@ -109,6 +111,11 @@ impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
         let (mut db_client, db_connection) =
             tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
+
+        let db_pool = PgPoolOptions::new(&config.db_url)?
+            .max_connections(5)
+            .connect()
+            .await?;
 
         // The connection object performs the actual communication with the
         // database, so spawn it off to run on its own.
@@ -155,6 +162,7 @@ impl Client {
             config,
             broadcast: sender,
             db_client: Arc::new(db_client),
+            db_pool,
             inner: Mutex::new(seabird_client),
         })
     }
@@ -371,8 +379,8 @@ impl Context {
         }
     }
 
-    pub fn get_db(&self) -> Arc<tokio_postgres::Client> {
-        self.client.db_client.clone()
+    pub fn get_db(&self) -> PgPool {
+        self.client.db_pool.clone()
     }
 }
 

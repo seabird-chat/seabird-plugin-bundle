@@ -28,7 +28,7 @@ impl NoaaPlugin {
 
         // Only set the station if a request was successful.
         NoaaLocation::set_for_name(
-            ctx.get_db(),
+            &ctx.get_db(),
             ctx.sender()
                 .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &station[..],
@@ -58,7 +58,7 @@ impl NoaaPlugin {
 
         // Only set the station if a request was successful.
         NoaaLocation::set_for_name(
-            ctx.get_db(),
+            &ctx.get_db(),
             ctx.sender()
                 .ok_or_else(|| format_err!("couldn't set location: event missing sender"))?,
             &station[..],
@@ -83,29 +83,24 @@ pub struct NoaaLocation {
 }
 
 impl NoaaLocation {
-    async fn get_by_name(conn: Arc<tokio_postgres::Client>, nick: &str) -> Result<Option<Self>> {
-        Ok(conn
-            .query_opt(
-                "SELECT nick, station FROM noaa_location WHERE nick=$1;",
-                &[&nick],
-            )
-            .await?
-            .map(|row| NoaaLocation {
-                nick: row.get(0),
-                station: row.get(1),
-            }))
+    async fn get_by_name(conn: &sqlx::PgPool, nick: &str) -> Result<Option<Self>> {
+        Ok(sqlx::query_as!(
+            NoaaLocation,
+            "SELECT nick, station FROM noaa_location WHERE nick=$1;",
+            nick,
+        )
+        .fetch_optional(conn)
+        .await?)
     }
 
-    async fn set_for_name(
-        conn: Arc<tokio_postgres::Client>,
-        nick: &str,
-        station: &str,
-    ) -> Result<()> {
-        conn.execute(
+    async fn set_for_name(conn: &sqlx::PgPool, nick: &str, station: &str) -> Result<()> {
+        sqlx::query!(
             "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)
 ON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
-            &[&nick, &station],
+            nick,
+            station,
         )
+        .execute(conn)
         .await?;
 
         Ok(())
@@ -129,7 +124,7 @@ async fn extract_station(ctx: &Context, arg: Option<&str>) -> Result<Option<Stri
     match arg {
         Some(station) => Ok(Some(station.to_string())),
         None => Ok(NoaaLocation::get_by_name(
-            ctx.get_db(),
+            &ctx.get_db(),
             ctx.sender()
                 .ok_or_else(|| format_err!("couldn't look up station: event missing sender"))?,
         )
