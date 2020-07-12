@@ -8,8 +8,10 @@ impl Plugin for MentionPlugin {
         Ok(MentionPlugin {})
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
-        while let Some(ctx) = stream.next().await {
+    async fn run(self, bot: Arc<Client>) -> Result<()> {
+        let mut stream = bot.subscribe();
+
+        while let Ok(ctx) = stream.recv().await {
             if let Ok(Event::Mention(msg)) = ctx.as_event() {
                 let res = match msg {
                     "ping" => ctx.mention_reply("pong").await,
@@ -26,6 +28,6 @@ impl Plugin for MentionPlugin {
             }
         }
 
-        Err(format_err!("mention plugin exited early"))
+        Err(format_err!("mention plugin lagged"))
     }
 }

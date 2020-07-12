@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use maplit::btreeset;
-use tokio::sync::broadcast;
 
 use crate::plugins;
 use crate::prelude::*;
+
 #[async_trait]
 pub trait Plugin {
     fn new_from_env() -> Result<Self>
@@ -15,39 +15,7 @@ pub trait Plugin {
         Vec::new()
     }
 
-    async fn run(self, bot: Arc<Client>, stream: EventStream) -> Result<()>;
-}
-
-pub struct EventStream(Option<broadcast::Receiver<Arc<Context>>>);
-
-impl Stream for EventStream {
-    type Item = Arc<Context>;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        use std::task::Poll;
-
-        let inner = &mut self.0;
-
-        if let Some(poller) = inner {
-            // NOTE: we need to use this undocumented method or it'll never be
-            // woken up.
-            match poller.poll_recv(cx) {
-                Poll::Ready(Err(_)) => {
-                    // If the stream is done, drop the inner receiver and return
-                    // a finalized stream.
-                    inner.take();
-                    Poll::Ready(None)
-                }
-                Poll::Ready(Ok(item)) => Poll::Ready(Some(item)),
-                Poll::Pending => Poll::Pending,
-            }
-        } else {
-            Poll::Ready(None)
-        }
-    }
+    async fn run(self, bot: Arc<Client>) -> Result<()>;
 }
 
 pub type CommandMetadata = crate::proto::CommandMetadata;
@@ -68,16 +36,10 @@ where
     let commands = plugin.command_metadata();
     let bot = bot.clone();
 
-    let stream = bot.subscribe();
-
     // TODO: we have a Result getting lost here
-    let handle =
-        tokio::task::spawn(async move { plugin.run(bot, EventStream(Some(stream))).await });
+    let handle = tokio::task::spawn(async move { plugin.run(bot).await });
 
-    Ok(PluginMetadata {
-        handle,
-        commands,
-    })
+    Ok(PluginMetadata { handle, commands })
 }
 
 pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {

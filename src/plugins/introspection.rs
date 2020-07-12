@@ -40,8 +40,10 @@ impl Plugin for IntrospectionPlugin {
         }]
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
-        while let Some(ctx) = stream.next().await {
+    async fn run(self, bot: Arc<Client>) -> Result<()> {
+        let mut stream = bot.subscribe();
+
+        while let Ok(ctx) = stream.recv().await {
             match ctx.as_event() {
                 Ok(Event::Command("uptime", _)) => {
                     let elapsed = self.started.elapsed();
@@ -68,6 +70,6 @@ impl Plugin for IntrospectionPlugin {
             }
         }
 
-        Err(format_err!("introspection plugin exited early"))
+        Err(format_err!("introspection plugin lagged"))
     }
 }

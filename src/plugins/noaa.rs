@@ -187,8 +187,10 @@ impl Plugin for NoaaPlugin {
         ]
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
-        while let Some(ctx) = stream.next().await {
+    async fn run(self, bot: Arc<Client>) -> Result<()> {
+        let mut stream = bot.subscribe();
+
+        while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
                 Ok(Event::Command("metar", arg)) => self.handle_metar(&ctx, arg).await,
                 Ok(Event::Command("taf", arg)) => self.handle_taf(&ctx, arg).await,
@@ -198,6 +200,6 @@ impl Plugin for NoaaPlugin {
             crate::check_err(&ctx, res).await;
         }
 
-        Err(format_err!("noaa plugin exited early"))
+        Err(format_err!("noaa plugin lagged"))
     }
 }

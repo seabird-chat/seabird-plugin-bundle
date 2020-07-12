@@ -144,8 +144,10 @@ impl Plugin for KarmaPlugin {
         }]
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
-        while let Some(ctx) = stream.next().await {
+    async fn run(self, bot: Arc<Client>) -> Result<()> {
+        let mut stream = bot.subscribe();
+
+        while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
                 Ok(Event::Command("karma", Some(arg))) => self.handle_karma(&ctx, arg).await,
                 Ok(Event::Message(_, msg)) => self.handle_privmsg(&ctx, msg).await,
@@ -155,6 +157,6 @@ impl Plugin for KarmaPlugin {
             crate::check_err(&ctx, res).await;
         }
 
-        Err(format_err!("karma plugin exited early"))
+        Err(format_err!("karma plugin lagged"))
     }
 }

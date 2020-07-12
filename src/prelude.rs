@@ -10,7 +10,7 @@ pub use unicode_segmentation::UnicodeSegmentation;
 
 pub use crate::client::{Client, ClientConfig, Context, Event};
 pub use crate::error::Result;
-pub use crate::plugin::{CommandMetadata, EventStream, Plugin};
+pub use crate::plugin::{CommandMetadata, Plugin};
 pub use crate::proto;
 pub use crate::proto::event::Inner as SeabirdEvent;
 pub(crate) use crate::utils;

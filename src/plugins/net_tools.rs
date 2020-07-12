@@ -158,8 +158,10 @@ impl Plugin for NetToolsPlugin {
         }]
     }
 
-    async fn run(self, _bot: Arc<Client>, mut stream: EventStream) -> Result<()> {
-        while let Some(ctx) = stream.next().await {
+    async fn run(self, bot: Arc<Client>) -> Result<()> {
+        let mut stream = bot.subscribe();
+
+        while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
                 Ok(Event::Command("dig", Some(arg))) => self.handle_dig(&ctx, arg).await,
                 Ok(Event::Command("dig", None)) => Err(anyhow::format_err!("Not enough arguments")),
@@ -169,6 +171,6 @@ impl Plugin for NetToolsPlugin {
             crate::check_err(&ctx, res).await;
         }
 
-        Err(format_err!("net_tools plugin exited early"))
+        Err(format_err!("net_tools plugin lagged"))
     }
 }
