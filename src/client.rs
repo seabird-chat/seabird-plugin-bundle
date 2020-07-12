@@ -69,7 +69,6 @@ pub struct Client {
     config: ClientConfig,
     inner: Mutex<SeabirdClient<tonic::transport::Channel>>,
     db_pool: sqlx::PgPool,
-    db_client: Arc<tokio_postgres::Client>,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
 
@@ -109,27 +108,12 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
-        let (mut db_client, db_connection) =
-            tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
-
         let db_pool = PgPoolOptions::new(&config.db_url)?
             .max_connections(5)
             .connect()
             .await?;
 
-        // The connection object performs the actual communication with the
-        // database, so spawn it off to run on its own.
-        //
-        // TODO: make sure it actually fails the bot if it exits.
-        tokio::spawn(async move {
-            if let Err(e) = db_connection.await {
-                panic!("connection error: {}", e);
-            }
-        });
-
-        crate::migrations::runner()
-            .run_async(&mut db_client)
-            .await?;
+        crate::migrations::run(&db_pool).await?;
 
         let uri: Uri = config.url.parse().context("failed to parse SEABIRD_URL")?;
         let mut channel_builder = Channel::builder(uri.clone());
@@ -161,7 +145,6 @@ impl Client {
         Ok(Client {
             config,
             broadcast: sender,
-            db_client: Arc::new(db_client),
             db_pool,
             inner: Mutex::new(seabird_client),
         })
