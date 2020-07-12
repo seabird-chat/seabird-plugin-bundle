@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::prelude::*;
 
-#[derive(Debug)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct Karma {
     pub name: String,
     pub score: i32,
@@ -34,7 +34,7 @@ impl Karma {
             "INSERT INTO karma (name, score) VALUES ($1, $2)
 ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
             name,
-            score,
+            score
         )
         .execute(conn)
         .await?;

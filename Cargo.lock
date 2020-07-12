@@ -1754,7 +1754,7 @@ dependencies = [
 [[package]]
 name = "sqlx"
 version = "0.4.0-pre"
-source = "git+https://github.com/belak/sqlx-rs?branch=pub-migration-constructors#2185fcf2f23af021d3fe68b29b6be860d36e89ed"
+source = "git+https://github.com/launchbadge/sqlx#93cab2a197c9d92720b07cd77ca2c2e0626937c8"
 dependencies = [
  "sqlx-core",
  "sqlx-macros",
@@ -1763,7 +1763,7 @@ dependencies = [
 [[package]]
 name = "sqlx-core"
 version = "0.4.0-pre"
-source = "git+https://github.com/belak/sqlx-rs?branch=pub-migration-constructors#2185fcf2f23af021d3fe68b29b6be860d36e89ed"
+source = "git+https://github.com/launchbadge/sqlx#93cab2a197c9d92720b07cd77ca2c2e0626937c8"
 dependencies = [
  "atoi",
  "base64 0.12.3",
@@ -1806,7 +1806,7 @@ dependencies = [
 [[package]]
 name = "sqlx-macros"
 version = "0.4.0-pre"
-source = "git+https://github.com/belak/sqlx-rs?branch=pub-migration-constructors#2185fcf2f23af021d3fe68b29b6be860d36e89ed"
+source = "git+https://github.com/launchbadge/sqlx#93cab2a197c9d92720b07cd77ca2c2e0626937c8"
 dependencies = [
  "dotenv",
  "either",
@@ -1823,7 +1823,7 @@ dependencies = [
 [[package]]
 name = "sqlx-rt"
 version = "0.1.0-pre"
-source = "git+https://github.com/belak/sqlx-rs?branch=pub-migration-constructors#2185fcf2f23af021d3fe68b29b6be860d36e89ed"
+source = "git+https://github.com/launchbadge/sqlx#93cab2a197c9d92720b07cd77ca2c2e0626937c8"
 dependencies = [
  "native-tls",
  "once_cell",

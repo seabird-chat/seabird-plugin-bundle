@@ -76,7 +76,7 @@ impl NoaaPlugin {
     }
 }
 
-#[derive(Debug)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct NoaaLocation {
     pub nick: String,
     pub station: String,
@@ -87,7 +87,7 @@ impl NoaaLocation {
         Ok(sqlx::query_as!(
             NoaaLocation,
             "SELECT nick, station FROM noaa_location WHERE nick=$1;",
-            nick,
+            nick
         )
         .fetch_optional(conn)
         .await?)
@@ -98,7 +98,7 @@ impl NoaaLocation {
             "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)
 ON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
             nick,
-            station,
+            station
         )
         .execute(conn)
         .await?;

@@ -177,7 +177,7 @@ enum LocationStatus {
     SingleLocation(ForecastLocation),
 }
 
-#[derive(Debug)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct ForecastLocation {
     pub nick: String,
     pub address: String,
@@ -199,7 +199,7 @@ impl ForecastLocation {
         Ok(sqlx::query_as!(
             ForecastLocation,
             "SELECT nick, address, lat, lng FROM forecast_location WHERE nick=$1;",
-            nick,
+            nick
         )
         .fetch_optional(conn)
         .await?)
@@ -219,7 +219,7 @@ UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
             nick,
             address,
             lat,
-            lng,
+            lng
         )
         .execute(conn)
         .await?;

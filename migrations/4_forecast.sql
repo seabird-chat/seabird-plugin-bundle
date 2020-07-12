@@ -1,4 +1,4 @@
-CREATE TABLE public.forecast_location (
+CREATE TABLE IF NOT EXISTS public.forecast_location (
     id serial PRIMARY KEY,
     nick text UNIQUE NOT NULL,
     address text NOT NULL,
