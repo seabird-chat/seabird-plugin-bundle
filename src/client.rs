@@ -108,9 +108,9 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
-        let db_pool = PgPoolOptions::new(&config.db_url)?
+        let db_pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect()
+            .connect(&config.db_url)
             .await?;
 
         crate::migrations::run(&db_pool).await?;

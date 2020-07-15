@@ -1,3 +1,134 @@
 {
-  "db": "PostgreSQL"
+  "db": "PostgreSQL",
+  "1a9de16cbf535d3ae46afe3661aa371fe5232819979c018d51d00aeb7ea6f240": {
+    "query": "INSERT INTO forecast_location (nick, address, lat, lng) VALUES ($1, $2, $3, $4)\nON CONFLICT (nick) DO\nUPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Float8",
+          "Float8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "32b09c7fff87018e6aaa2a44310738cc62cac7454c795313179c425b0ce412c0": {
+    "query": "SELECT name, score FROM karma WHERE name=$1;",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "score",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "4edd17f3d0c44b1b2c6a253dd79c71ba0cb428b6e82ede32d3ac0779fa65f0aa": {
+    "query": "SELECT nick, station FROM noaa_location WHERE nick=$1;",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nick",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "station",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "9d3cfd4080385242f57cfa67b4ae94fe4eb066c622f8cb13675b14922925c328": {
+    "query": "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)\nON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "c31080bc829a3a13b6297ce67c8987083dac31dd5df18a27c308afa5af414587": {
+    "query": "SELECT nick, address, lat, lng FROM forecast_location WHERE nick=$1;",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "nick",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "address",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "lat",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 3,
+          "name": "lng",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "c3cc39d499ef96fde068affdf56a812474e88753ccece39f4d19b3bf8cd0c89c": {
+    "query": "INSERT INTO karma (name, score) VALUES ($1, $2)\nON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  }
 }
