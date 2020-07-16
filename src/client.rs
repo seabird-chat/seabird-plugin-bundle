@@ -24,6 +24,7 @@ pub struct ClientConfig {
     pub disabled_plugins: BTreeSet<String>,
 
     pub db_url: String,
+    pub db_pool_size: u32,
 }
 
 impl ClientConfig {
@@ -31,6 +32,7 @@ impl ClientConfig {
         url: String,
         token: String,
         db_url: String,
+        db_pool_size: u32,
         enabled_plugins: BTreeSet<String>,
         disabled_plugins: BTreeSet<String>,
     ) -> Self {
@@ -38,6 +40,7 @@ impl ClientConfig {
             url,
             token,
             db_url,
+            db_pool_size,
             enabled_plugins,
             disabled_plugins,
         }
@@ -109,7 +112,7 @@ impl Client {
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
         let db_pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(config.db_pool_size)
             .connect(&config.db_url)
             .await?;
 

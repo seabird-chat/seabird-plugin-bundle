@@ -66,6 +66,10 @@ async fn main() -> error::Result<()> {
             .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
         dotenv::var("DATABASE_URL")
             .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
+        dotenv::var("DATABASE_POOL_SIZE")
+            .unwrap_or_else("5")
+            .parse()
+            .context("Invalid $DATABASE_POOL_SIZE")?,
         dotenv::var("SEABIRD_ENABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
             .split_terminator(',')
