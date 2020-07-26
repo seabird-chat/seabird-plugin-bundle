@@ -1,5 +1,5 @@
 [package]
-name = "seabird"
+name = "seabird-plugin-bundle"
 version = "0.1.0"
 authors = ["Kaleb Elwert <belak@coded.io>"]
 edition = "2018"
@@ -14,9 +14,7 @@ futures = "0.3"
 log = "0.4"
 maplit = "1.0"
 pretty_env_logger = "0.4"
-prost = "0.6"
 tokio = { version = "0.2", features = ["macros", "rt-core", "stream", "sync", "time"] }
-tonic = { version = "0.2", features = ["tls", "tls-roots"] }
 
 # Plugin dependencies
 barrel = { version = "0.6", features = ["pg"] }
@@ -37,5 +35,5 @@ unicode-segmentation = "1.6"
 # from git.
 refinery = { git = "https://github.com/rust-db/refinery", features = ["tokio-postgres"] }
 
-[build-dependencies]
-tonic-build = { version = "0.2", features = ["prost"] }
+# Client library
+seabird = "0.1.0-alpha.1"

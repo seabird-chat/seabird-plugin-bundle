@@ -13,17 +13,7 @@ mod plugins;
 mod prelude;
 pub(crate) mod utils;
 
-pub mod proto {
-    pub mod common {
-        tonic::include_proto!("common");
-    }
-    pub mod seabird {
-        tonic::include_proto!("seabird");
-    }
-
-    pub use self::common::*;
-    pub use self::seabird::*;
-}
+pub use seabird::proto;
 
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
