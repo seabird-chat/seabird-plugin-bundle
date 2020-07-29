@@ -67,7 +67,7 @@ async fn main() -> error::Result<()> {
         dotenv::var("DATABASE_URL")
             .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
         dotenv::var("DATABASE_POOL_SIZE")
-            .unwrap_or_else("5")
+            .unwrap_or_else(|_| "5".to_string())
             .parse()
             .context("Invalid $DATABASE_POOL_SIZE")?,
         dotenv::var("SEABIRD_ENABLED_PLUGINS")
