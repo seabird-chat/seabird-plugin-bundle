@@ -3,23 +3,13 @@ use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
-use http::Uri;
-use sqlx::postgres::{PgPool, PgPoolOptions};
-use tokio::stream::StreamExt;
 use tokio::sync::{broadcast, Mutex};
-use tonic::{
-    metadata::{Ascii, MetadataValue},
-    transport::{Channel, ClientTlsConfig},
-};
 
 use crate::prelude::*;
-use crate::proto::seabird::seabird_client::SeabirdClient;
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
-    pub url: String,
-    pub token: String,
-
+    pub inner: seabird::ClientConfig,
     pub enabled_plugins: BTreeSet<String>,
     pub disabled_plugins: BTreeSet<String>,
 
@@ -37,8 +27,7 @@ impl ClientConfig {
         disabled_plugins: BTreeSet<String>,
     ) -> Self {
         ClientConfig {
-            url,
-            token,
+            inner: seabird::ClientConfig { url, token },
             db_url,
             db_pool_size,
             enabled_plugins,
@@ -70,32 +59,34 @@ impl ClientConfig {
 #[derive(Debug)]
 pub struct Client {
     config: ClientConfig,
-    inner: Mutex<SeabirdClient<tonic::transport::Channel>>,
+    inner: Mutex<seabird::Client>,
     db_pool: sqlx::PgPool,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
 
 impl Client {
-    pub async fn send_message(&self, channel_id: &str, text: &str) -> Result<()> {
+    pub async fn send_message(
+        &self,
+        channel_id: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
         self.inner
             .lock()
             .await
-            .send_message(proto::SendMessageRequest {
-                channel_id: channel_id.to_string(),
-                text: text.to_string(),
-            })
+            .send_message(channel_id, text)
             .await?;
         Ok(())
     }
 
-    pub async fn send_private_message(&self, user_id: &str, text: &str) -> Result<()> {
+    pub async fn send_private_message(
+        &self,
+        user_id: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
         self.inner
             .lock()
             .await
-            .send_private_message(proto::SendPrivateMessageRequest {
-                user_id: user_id.to_string(),
-                text: text.to_string(),
-            })
+            .send_private_message(user_id, text)
             .await?;
         Ok(())
     }
@@ -111,37 +102,14 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
-        let db_pool = PgPoolOptions::new()
+        let db_pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(config.db_pool_size)
             .connect(&config.db_url)
             .await?;
 
         crate::migrations::run(&db_pool).await?;
 
-        let uri: Uri = config.url.parse().context("failed to parse SEABIRD_URL")?;
-        let mut channel_builder = Channel::builder(uri.clone());
-
-        match uri.scheme_str() {
-            None | Some("https") => {
-                println!("Enabling tls");
-                channel_builder = channel_builder.tls_config(ClientTlsConfig::new())?;
-            }
-            _ => {}
-        }
-
-        let channel = channel_builder
-            .connect()
-            .await
-            .context("Failed to connect to seabird")?;
-
-        let auth_header: MetadataValue<Ascii> = format!("Bearer {}", config.token).parse()?;
-
-        let seabird_client =
-            SeabirdClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
-                req.metadata_mut()
-                    .insert("authorization", auth_header.clone());
-                Ok(req)
-            });
+        let seabird_client = seabird::Client::new(config.inner.clone()).await?;
 
         let (sender, _) = broadcast::channel(100);
 
@@ -161,6 +129,7 @@ impl Client {
             .inner
             .lock()
             .await
+            .inner_mut_ref()
             .stream_events(proto::StreamEventsRequest { commands })
             .await?
             .into_inner();
@@ -272,6 +241,12 @@ impl Context {
             SeabirdEvent::PrivateMessage(message) => {
                 message.source.as_ref().map(|u| u.display_name.as_str())
             }
+
+            // Seabird-sent events
+            SeabirdEvent::SendMessage(message) => Some(message.sender.as_str()),
+            SeabirdEvent::SendPrivateMessage(message) => Some(message.sender.as_str()),
+            SeabirdEvent::PerformAction(message) => Some(message.sender.as_str()),
+            SeabirdEvent::PerformPrivateAction(message) => Some(message.sender.as_str()),
         }
     }
 
@@ -362,10 +337,14 @@ impl Context {
                     )
                     .await
             }
+            SeabirdEvent::SendMessage(_)
+            | SeabirdEvent::SendPrivateMessage(_)
+            | SeabirdEvent::PerformAction(_)
+            | SeabirdEvent::PerformPrivateAction(_) => Err(format_err!("cannot reply to self")),
         }
     }
 
-    pub fn get_db(&self) -> PgPool {
+    pub fn get_db(&self) -> sqlx::PgPool {
         self.client.db_pool.clone()
     }
 }
