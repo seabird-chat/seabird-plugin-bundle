@@ -1,9 +1,11 @@
-FROM rust:1.43 as builder
+FROM rust:1.46 as builder
 WORKDIR /usr/src/seabird-rs
 
 # NOTE: tonic_build uses rustfmt to properly format the output files and give
 # better errors.
 RUN rustup component add rustfmt
+
+RUN cargo install --version=0.1.0-beta.1 sqlx-cli
 
 # Copy over only the files which specify dependencies
 COPY Cargo.toml Cargo.lock ./
@@ -22,5 +24,7 @@ RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird /
 FROM debian:buster-slim
 ENV RUST_LOG=info
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
+COPY --from=builder /usr/local/cargo/bin/cargo-sqlx /usr/local/bin/cargo-sqlx
 COPY --from=builder /usr/local/bin/seabird /usr/local/bin/seabird
 CMD ["seabird"]
