@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::prelude::*;
 
-#[derive(Debug)]
+#[derive(sqlx::FromRow, Debug)]
 pub struct Karma {
     pub name: String,
     pub score: i32,
@@ -17,34 +17,26 @@ impl Karma {
         name.to_lowercase()
     }
 
-    async fn get_by_name(conn: &tokio_postgres::Client, name: &str) -> Result<Self> {
-        let res = conn
-            .query_opt("SELECT name, score FROM karma WHERE name=$1;", &[&name])
-            .await?;
-
-        Ok(if let Some(row) = res {
-            Karma {
-                name: row.get(0),
-                score: row.get(1),
-            }
-        } else {
-            Karma {
-                name: name.to_string(),
-                score: 0,
-            }
-        })
+    async fn get_by_name(conn: &sqlx::PgPool, name: &str) -> Result<Self> {
+        Ok(
+            sqlx::query_as!(Karma, "SELECT name, score FROM karma WHERE name=$1;", name)
+                .fetch_optional(conn)
+                .await?
+                .unwrap_or_else(|| Karma {
+                    name: name.to_string(),
+                    score: 0,
+                }),
+        )
     }
 
-    async fn create_or_update(
-        conn: &tokio_postgres::Client,
-        name: &str,
-        score: i32,
-    ) -> Result<Self> {
-        conn.execute(
+    async fn create_or_update(conn: &sqlx::PgPool, name: &str, score: i32) -> Result<Self> {
+        sqlx::query!(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
 ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
-            &[&name, &score],
+            name,
+            score
         )
+        .execute(conn)
         .await?;
 
         Karma::get_by_name(conn, &name).await

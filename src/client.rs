@@ -14,6 +14,7 @@ pub struct ClientConfig {
     pub disabled_plugins: BTreeSet<String>,
 
     pub db_url: String,
+    pub db_pool_size: u32,
 }
 
 impl ClientConfig {
@@ -21,12 +22,14 @@ impl ClientConfig {
         url: String,
         token: String,
         db_url: String,
+        db_pool_size: u32,
         enabled_plugins: BTreeSet<String>,
         disabled_plugins: BTreeSet<String>,
     ) -> Self {
         ClientConfig {
             inner: seabird::ClientConfig { url, token },
             db_url,
+            db_pool_size,
             enabled_plugins,
             disabled_plugins,
         }
@@ -57,7 +60,7 @@ impl ClientConfig {
 pub struct Client {
     config: ClientConfig,
     inner: Mutex<seabird::Client>,
-    db_client: Arc<tokio_postgres::Client>,
+    db_pool: sqlx::PgPool,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
 
@@ -99,22 +102,12 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
-        let (mut db_client, db_connection) =
-            tokio_postgres::connect(&config.db_url, tokio_postgres::NoTls).await?;
-
-        // The connection object performs the actual communication with the
-        // database, so spawn it off to run on its own.
-        //
-        // TODO: make sure it actually fails the bot if it exits.
-        tokio::spawn(async move {
-            if let Err(e) = db_connection.await {
-                panic!("connection error: {}", e);
-            }
-        });
-
-        crate::migrations::runner()
-            .run_async(&mut db_client)
+        let db_pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(config.db_pool_size)
+            .connect(&config.db_url)
             .await?;
+
+        crate::migrations::run(&db_pool).await?;
 
         let seabird_client = seabird::Client::new(config.inner.clone()).await?;
 
@@ -123,7 +116,7 @@ impl Client {
         Ok(Client {
             config,
             broadcast: sender,
-            db_client: Arc::new(db_client),
+            db_pool,
             inner: Mutex::new(seabird_client),
         })
     }
@@ -351,8 +344,8 @@ impl Context {
         }
     }
 
-    pub fn get_db(&self) -> Arc<tokio_postgres::Client> {
-        self.client.db_client.clone()
+    pub fn get_db(&self) -> sqlx::PgPool {
+        self.client.db_pool.clone()
     }
 }
 
