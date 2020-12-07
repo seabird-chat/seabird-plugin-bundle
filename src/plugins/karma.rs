@@ -65,44 +65,40 @@ fn parse_karma_change(change_str: &str) -> Result<i32> {
     let missing_successive_minus = "you need at least two successive \"-\"s to decrement, silly!";
 
     for c in change_str.chars() {
-        match c {
-            '+' => match state {
-                ParseState::Nothing => {
-                    state = ParseState::ChangeToAdd;
-                }
-                ParseState::ChangeToAdd => {
-                    state = ParseState::Add;
-                    counter += 1;
-                }
-                ParseState::Add => {
-                    counter += 1;
-                }
-                ParseState::ChangeToSubtract => {
-                    return Err(format_err!(missing_successive_plus));
-                }
-                ParseState::Subtract => {
-                    state = ParseState::ChangeToAdd;
-                }
-            },
-            '-' => match state {
-                ParseState::Nothing => {
-                    state = ParseState::ChangeToSubtract;
-                }
-                ParseState::ChangeToAdd => {
-                    return Err(format_err!(missing_successive_minus));
-                }
-                ParseState::Add => {
-                    state = ParseState::ChangeToSubtract;
-                }
-                ParseState::ChangeToSubtract => {
-                    state = ParseState::Subtract;
-                    counter -= 1;
-                }
-                ParseState::Subtract => {
-                    counter -= 1;
-                }
-            },
-            unsupported_char => {
+        match (c, &state) {
+            ('+', ParseState::Nothing) => {
+                state = ParseState::ChangeToAdd;
+            }
+            ('+', ParseState::ChangeToAdd) => {
+                state = ParseState::Add;
+                counter += 1;
+            }
+            ('+', ParseState::Add) => {
+                counter += 1;
+            }
+            ('+', ParseState::ChangeToSubtract) => {
+                return Err(format_err!(missing_successive_plus));
+            }
+            ('+', ParseState::Subtract) => {
+                state = ParseState::ChangeToAdd;
+            }
+            ('-', ParseState::Nothing) => {
+                state = ParseState::ChangeToSubtract;
+            }
+            ('-', ParseState::ChangeToAdd) => {
+                return Err(format_err!(missing_successive_minus));
+            }
+            ('-', ParseState::Add) => {
+                state = ParseState::ChangeToSubtract;
+            }
+            ('-', ParseState::ChangeToSubtract) => {
+                state = ParseState::Subtract;
+                counter -= 1;
+            }
+            ('-', ParseState::Subtract) => {
+                counter -= 1;
+            }
+            (unsupported_char, _) => {
                 return Err(format_err!(
                     "character \"{}\" not supported by the Karma Adjustment Bureau",
                     unsupported_char
