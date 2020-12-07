@@ -218,6 +218,14 @@ impl Plugin for KarmaPlugin {
         while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
                 Ok(Event::Command("karma", Some(arg))) => self.handle_karma(&ctx, arg).await,
+                Ok(Event::Command("karma", None)) => {
+                    self.handle_karma(
+                        &ctx,
+                        ctx
+                            .sender()
+                            .ok_or_else(|| format_err!("no nick found to use for karma check (not provided in source message)"))?,
+                    ).await
+                }
                 Ok(Event::Message(_, msg)) => self.handle_privmsg(&ctx, msg).await,
                 _ => Ok(()),
             };
