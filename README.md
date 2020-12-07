@@ -1,4 +1,4 @@
-# seabird-rs
+# seabird-plugin-bundle
 
 ## Requirements
 
@@ -9,7 +9,7 @@
 
 Settings can either be included as a part of the environment or in a .env file.
 
-- `SEABIRD_URL`
+- `SEABIRD_HOST`
 - `SEABIRD_TOKEN`
 - `DATABASE_URL` - connection string for the database - can either be in connection string or url format
 - `SEABIRD_ENABLED_PLUGINS` - comma-separated list of enabled plugins - if this is empty, all plugins will be loaded
@@ -26,3 +26,18 @@ Unfortunately, writing a new plugin requires a few steps.
 3. You must add your plugin to `src/plugins/mod.rs`. See existing entries in the file for reference.
 4. You must add your unique plugin name to the `supported_plugins` `Vec` from step one.
 5. You must load your plugin in `src/plugin.rs` `load()`. See existing entries for reference.
+
+## Building
+
+```
+cargo build
+```
+
+`seabird-plugin-bundle` will read `DATABASE_URL` at compile time to typecheck queries. If you see errors like `relation "karma" does not exist`, that means that migrations have had issues. The recommended fix is the following:
+
+```
+$ cargo install sqlx-cli
+$ sqlx migrate run
+```
+
+Builds should succeed after this.
