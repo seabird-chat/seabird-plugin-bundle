@@ -3,6 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
+use seabird::proto::seabird::{CoreInfoRequest, CoreInfoResponse};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::prelude::*;
@@ -89,6 +90,17 @@ impl Client {
             .send_private_message(user_id, text)
             .await?;
         Ok(())
+    }
+
+    pub async fn get_core_info(&self) -> Result<CoreInfoResponse> {
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .inner_mut_ref()
+            .get_core_info(CoreInfoRequest {})
+            .await?
+            .into_inner())
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Arc<Context>> {
@@ -248,6 +260,10 @@ impl Context {
             SeabirdEvent::PerformAction(message) => Some(message.sender.as_str()),
             SeabirdEvent::PerformPrivateAction(message) => Some(message.sender.as_str()),
         }
+    }
+
+    pub async fn get_core_info(&self) -> Result<CoreInfoResponse> {
+        self.client.get_core_info().await
     }
 
     pub async fn mention_reply(&self, msg: &str) -> Result<()> {
