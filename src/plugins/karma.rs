@@ -185,9 +185,9 @@ impl KarmaPlugin {
             write!(line, "{}'s karma is now {}", name, karma.score)?;
 
             if raw_change != change {
-                line.push_str(" Buzzkill Mode (tm) enforced a limit of 5");
+                line.push_str(". Buzzkill Mode (tm) enforced a limit of 5");
             } else if raw_change == 0 {
-                line.push_str(" Well done. Nothing happened.");
+                line.push_str(". Well done. Nothing happened.");
             }
 
             lines.push(line);
