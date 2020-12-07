@@ -156,9 +156,7 @@ impl KarmaPlugin {
 
         // Loop through all captures, adding them to the output.
         for capture in captures {
-            let name = &capture[1].trim_start_matches('"').trim_end_matches('"');
-
-            let cleaned_name = Karma::sanitize_name(name);
+            let cleaned_name = Karma::sanitize_name(&capture[1].trim_matches('"'));
 
             match parse_karma_change(&capture[2]) {
                 Ok(change) => {
