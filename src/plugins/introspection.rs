@@ -6,6 +6,8 @@ use time::Instant;
 
 use crate::prelude::*;
 
+const CLOCK_SKEW_TOLERANCE: u64 = 30;
+
 pub struct IntrospectionPlugin {
     started: Instant,
 }
@@ -43,10 +45,20 @@ impl IntrospectionPlugin {
             .as_secs();
 
         if current_time < info.startup_timestamp {
-            ctx.mention_reply("server somehow started in the future")
-                .await?;
+            if info.startup_timestamp - current_time < CLOCK_SKEW_TOLERANCE {
+                ctx.mention_reply("server started recently").await?;
+            } else {
+                ctx.mention_reply("server somehow started in the future")
+                    .await?;
+            }
 
             return Ok(());
+        }
+
+        // We check this in the other direction because both timestamps
+        // are unsigned, so we can't do abs()
+        if current_time - info.startup_timestamp < CLOCK_SKEW_TOLERANCE {
+            ctx.mention_reply("server started recently").await?;
         }
 
         let elapsed_seconds = current_time - info.startup_timestamp;
