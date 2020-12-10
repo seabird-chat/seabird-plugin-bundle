@@ -3,6 +3,9 @@ use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
+use seabird::proto::seabird::{
+    BackendConfigRequest, BackendConfigResponse, ListBackendsRequest, ListBackendsResponse,
+};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::prelude::*;
@@ -89,6 +92,28 @@ impl Client {
             .send_private_message(user_id, text)
             .await?;
         Ok(())
+    }
+
+    pub async fn list_backends(&self) -> Result<ListBackendsResponse> {
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .inner_mut_ref()
+            .list_backends(ListBackendsRequest {})
+            .await?
+            .into_inner())
+    }
+
+    pub async fn get_backend_config(&self, backend_id: String) -> Result<BackendConfigResponse> {
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .inner_mut_ref()
+            .get_backend_config(BackendConfigRequest { backend_id })
+            .await?
+            .into_inner())
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Arc<Context>> {
@@ -248,6 +273,14 @@ impl Context {
             SeabirdEvent::PerformAction(message) => Some(message.sender.as_str()),
             SeabirdEvent::PerformPrivateAction(message) => Some(message.sender.as_str()),
         }
+    }
+
+    pub async fn list_backends(&self) -> Result<ListBackendsResponse> {
+        self.client.list_backends().await
+    }
+
+    pub async fn get_backend_config(&self, backend_id: String) -> Result<BackendConfigResponse> {
+        self.client.get_backend_config(backend_id).await
     }
 
     pub async fn mention_reply(&self, msg: &str) -> Result<()> {
