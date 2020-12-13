@@ -62,9 +62,39 @@ impl Plugin for IntrospectionPlugin {
 
                     ctx.mention_reply(&ret[..]).await?;
                 }
+                Ok(Event::Command("backends", _)) => {
+                    let response = ctx.list_backends().await?;
+
+                    let mut lines = Vec::new();
+                    for backend in response.backends.into_iter() {
+                        lines.push(backend.id);
+                    }
+
+                    lines.sort();
+
+                    ctx.mention_reply(&lines.join(", ")).await?;
+                }
+                Ok(Event::Command("backend_metadata", arg)) => {
+                    let arg =
+                        arg.ok_or_else(|| format_err!("usage: backend_metadata <backend_id>"))?;
+
+                    let response = ctx.get_backend_info(arg.to_string()).await?;
+
+                    let mut lines = Vec::new();
+                    for (key, value) in response.metadata.into_iter() {
+                        lines.push(format!("{}={}", key, value));
+                    }
+
+                    lines.sort();
+
+                    ctx.mention_reply(&lines.join(", ")).await?;
+                }
                 Ok(Event::Command("version", _)) => {
-                    ctx.mention_reply(&format!("seabird-plugin-bundle {}-{}", SEABIRD_VERSION, GIT_VERSION))
-                        .await?;
+                    ctx.mention_reply(&format!(
+                        "seabird-plugin-bundle {}-{}",
+                        SEABIRD_VERSION, GIT_VERSION
+                    ))
+                    .await?;
                 }
                 _ => {}
             }
