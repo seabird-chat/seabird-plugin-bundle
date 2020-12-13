@@ -78,7 +78,7 @@ impl Plugin for IntrospectionPlugin {
                     let arg =
                         arg.ok_or_else(|| format_err!("usage: backend_config <backend_id>"))?;
 
-                    let response = ctx.get_backend_config(arg.to_string()).await?;
+                    let response = ctx.get_backend_info(arg.to_string()).await?;
 
                     let mut lines = Vec::new();
                     for (key, value) in response.config.into_iter() {
