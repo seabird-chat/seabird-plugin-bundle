@@ -74,9 +74,9 @@ impl Plugin for IntrospectionPlugin {
 
                     ctx.mention_reply(&lines.join(", ")).await?;
                 }
-                Ok(Event::Command("backend_config", arg)) => {
+                Ok(Event::Command("backend_metadata", arg)) => {
                     let arg =
-                        arg.ok_or_else(|| format_err!("usage: backend_config <backend_id>"))?;
+                        arg.ok_or_else(|| format_err!("usage: backend_metadata <backend_id>"))?;
 
                     let response = ctx.get_backend_info(arg.to_string()).await?;
 
