@@ -5,7 +5,7 @@ WORKDIR /usr/src/seabird-rs
 # better errors.
 RUN rustup component add rustfmt
 
-RUN cargo install --version=0.1.0-beta.1 sqlx-cli
+RUN cargo install --version=0.2.0 sqlx-cli
 
 # Copy over only the files which specify dependencies
 COPY Cargo.toml Cargo.lock ./
