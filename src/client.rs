@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
 use seabird::proto::seabird::{
-    BackendInfoRequest, BackendInfoResponse, ListBackendsRequest, ListBackendsResponse,
+    BackendInfoRequest, BackendInfoResponse, CoreInfoRequest, CoreInfoResponse,
+    ListBackendsRequest, ListBackendsResponse,
 };
 use tokio::sync::{broadcast, Mutex};
 
@@ -101,6 +102,17 @@ impl Client {
             .await
             .inner_mut_ref()
             .list_backends(ListBackendsRequest {})
+            .await?
+            .into_inner())
+    }
+
+    pub async fn get_core_info(&self) -> Result<CoreInfoResponse> {
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .inner_mut_ref()
+            .get_core_info(CoreInfoRequest {})
             .await?
             .into_inner())
     }
@@ -277,6 +289,10 @@ impl Context {
 
     pub async fn list_backends(&self) -> Result<ListBackendsResponse> {
         self.client.list_backends().await
+    }
+
+    pub async fn get_core_info(&self) -> Result<CoreInfoResponse> {
+        self.client.get_core_info().await
     }
 
     pub async fn get_backend_info(&self, backend_id: String) -> Result<BackendInfoResponse> {
