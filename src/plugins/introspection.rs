@@ -81,7 +81,7 @@ impl Plugin for IntrospectionPlugin {
                     let response = ctx.get_backend_info(arg.to_string()).await?;
 
                     let mut lines = Vec::new();
-                    for (key, value) in response.config.into_iter() {
+                    for (key, value) in response.metadata.into_iter() {
                         lines.push(format!("{}={}", key, value));
                     }
 
