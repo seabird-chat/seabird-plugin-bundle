@@ -18,3 +18,6 @@ pub use self::noaa::NoaaPlugin;
 
 mod introspection;
 pub use self::introspection::IntrospectionPlugin;
+
+mod help;
+pub use self::help::HelpPlugin;
