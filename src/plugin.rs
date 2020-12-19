@@ -51,6 +51,7 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "net_tools",
         "noaa",
         "introspection",
+        "help",
     ];
 
     let config = bot.get_config();
@@ -126,6 +127,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
 
     if config.plugin_enabled("introspection") {
         ret.push(start_plugin::<plugins::IntrospectionPlugin>(&bot)?);
+    }
+
+    if config.plugin_enabled("help") {
+        ret.push(start_plugin::<plugins::HelpPlugin>(&bot)?);
     }
 
     Ok(ret)
