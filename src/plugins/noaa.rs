@@ -171,13 +171,13 @@ impl Plugin for NoaaPlugin {
         vec![
             CommandMetadata {
                 name: "metar".to_string(),
-                short_help: "".to_string(),
-                full_help: "".to_string(),
+                short_help: "usage: metar [station]. fetches current METAR for given station.".to_string(),
+                full_help: "fetches current METAR for given station. if no station provided, most recent station is used.".to_string(),
             },
             CommandMetadata {
                 name: "taf".to_string(),
-                short_help: "".to_string(),
-                full_help: "".to_string(),
+                short_help: "usage: taf [station]. fetches current TAF for given station.".to_string(),
+                full_help: "fetches current TAF for given station. if no station provided, most recent station is used.".to_string(),
             },
         ]
     }

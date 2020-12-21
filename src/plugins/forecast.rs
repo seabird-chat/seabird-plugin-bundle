@@ -249,13 +249,13 @@ impl Plugin for ForecastPlugin {
         vec![
             CommandMetadata {
                 name: "weather".to_string(),
-                short_help: "".to_string(),
-                full_help: "".to_string(),
+                short_help: "usage: weather [location]. gives current weather.".to_string(),
+                full_help: "gives current weather for given location. if no location, defaults to most recent provided location.".to_string(),
             },
             CommandMetadata {
                 name: "forecast".to_string(),
-                short_help: "".to_string(),
-                full_help: "".to_string(),
+                short_help: "usage: forecast [location]. gives forecast.".to_string(),
+                full_help: "gives forecast for given location. if no location, defaults to most recent provided location.".to_string(),
             },
         ]
     }

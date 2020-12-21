@@ -46,8 +46,8 @@ impl Plugin for HelpPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "help".to_string(),
-            short_help: "gives usage for a command".to_string(),
-            full_help: "gives usage and other information for a command".to_string(),
+            short_help: "usage: help <command>. gives usage and help for a command.".to_string(),
+            full_help: "gives usage and other information for a command.".to_string(),
         }]
     }
 

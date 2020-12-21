@@ -1,5 +1,5 @@
-use std::fmt::Write;
 use std::convert::TryInto;
+use std::fmt::Write;
 
 use git_version::git_version;
 use time::{Duration, Instant};
@@ -106,11 +106,30 @@ impl Plugin for IntrospectionPlugin {
     }
 
     fn command_metadata(&self) -> Vec<CommandMetadata> {
-        vec![CommandMetadata {
-            name: "uptime".to_string(),
-            short_help: "".to_string(),
-            full_help: "".to_string(),
-        }]
+        vec![
+            CommandMetadata {
+                name: "uptime".to_string(),
+                short_help: "usage: uptime. gets current introspection plugin uptime.".to_string(),
+                full_help: "gets current introspection plugin uptime.".to_string(),
+            },
+            CommandMetadata {
+                name: "backends".to_string(),
+                short_help: "usage: backends. gets all connected backends.".to_string(),
+                full_help: "gets all connected backends.".to_string(),
+            },
+            CommandMetadata {
+                name: "backend_metadata".to_string(),
+                short_help:
+                    "usage: backend_metadata <backend_id>. gets metadata for the given backend."
+                        .to_string(),
+                full_help: "gets metadata for the given backend.".to_string(),
+            },
+            CommandMetadata {
+                name: "version".to_string(),
+                short_help: "usage: version. gets introspection plugin version.".to_string(),
+                full_help: "gets introspection plugin version.".to_string(),
+            },
+        ]
     }
 
     async fn run(self, bot: Arc<Client>) -> Result<()> {

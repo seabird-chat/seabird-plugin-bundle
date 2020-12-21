@@ -153,8 +153,9 @@ impl Plugin for NetToolsPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "dig".to_string(),
-            short_help: "".to_string(),
-            full_help: "".to_string(),
+            short_help: "usage: dig [record_type] <domain>. resolves the given domain.".to_string(),
+            full_help: "resolves the given domain. if no record_type is provided, assumes A/AAAA."
+                .to_string(),
         }]
     }
 

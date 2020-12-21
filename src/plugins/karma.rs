@@ -207,8 +207,10 @@ impl Plugin for KarmaPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "karma".to_string(),
-            short_help: "".to_string(),
-            full_help: "".to_string(),
+            short_help: "usage: karma [nick]. gives current karma of given nick.".to_string(),
+            full_help:
+                "gives current karma of given nick. if no nick provided, assumes message sender."
+                    .to_string(),
         }]
     }
 
