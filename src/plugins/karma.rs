@@ -124,7 +124,7 @@ fn parse_karma_change(change_str: &str) -> Result<i32> {
 impl KarmaPlugin {
     pub fn new() -> Self {
         KarmaPlugin {
-            re: Regex::new(r#"([\w]{2,}|".+?")([+-]+)(?:\s|$)"#).unwrap(),
+            re: Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#).unwrap(),
         }
     }
 }
