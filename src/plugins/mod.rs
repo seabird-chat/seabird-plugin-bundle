@@ -1,6 +1,9 @@
 // mod bucket;
 // pub use self::bucket::BucketPlugin;
 
+mod chance;
+pub use self::chance::ChancePlugin;
+
 mod forecast;
 pub use self::forecast::ForecastPlugin;
 
