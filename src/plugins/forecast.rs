@@ -113,10 +113,15 @@ impl ForecastPlugin {
         ctx.mention_reply(&format!("3 day forecast for {}.", location.address))
             .await?;
 
+        // We want to try and send all the messages, even if we're lagged out,
+        // so we collect all the results and after sending everything, check the
+        // errors.
+        let mut results = Vec::new();
+
         for day in res.into_iter().skip(1).take(3) {
             let weekday = day.time.format("%A");
 
-            ctx.mention_reply(&format!(
+            let ret = ctx.mention_reply(&format!(
                 "{}: High {:.2}°F, Low {:.2}°F, Humidity {:.0}%. {}.",
                 weekday,
                 day.temperature_high,
@@ -124,7 +129,13 @@ impl ForecastPlugin {
                 day.humidity,
                 utils::to_sentence_case(&day.summary),
             ))
-            .await?;
+            .await;
+
+            results.push(ret);
+        }
+
+        for res in results {
+            res?;
         }
 
         Ok(())
