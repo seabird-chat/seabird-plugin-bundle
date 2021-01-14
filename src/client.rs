@@ -77,7 +77,7 @@ impl Client {
         self.inner
             .lock()
             .await
-            .send_message(channel_id, text)
+            .send_message(channel_id, text, None)
             .await?;
         Ok(())
     }
@@ -90,7 +90,7 @@ impl Client {
         self.inner
             .lock()
             .await
-            .send_private_message(user_id, text)
+            .send_private_message(user_id, text, None)
             .await?;
         Ok(())
     }

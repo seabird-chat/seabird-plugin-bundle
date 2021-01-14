@@ -1548,9 +1548,9 @@ dependencies = [
 
 [[package]]
 name = "seabird"
-version = "0.1.0-alpha.6"
+version = "0.2.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a32b4e18412b0bb01c9641907a44fe419d7ba08955f6a25d2faec3bf775b055"
+checksum = "c6be28d953fd8b0ff66d64fdb673363232fd721be2cc17a8c51c0225e6d23a50"
 dependencies = [
  "anyhow",
  "http",
