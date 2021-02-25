@@ -69,6 +69,32 @@ pub struct Client {
 }
 
 impl Client {
+    pub async fn perform_action(
+        &self,
+        channel_id: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .perform_action(channel_id, text, None)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn perform_private_action(
+        &self,
+        user_id: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .perform_private_action(user_id, text, None)
+            .await?;
+        Ok(())
+    }
+
     pub async fn send_message(
         &self,
         channel_id: impl Into<String>,
@@ -392,6 +418,87 @@ impl Context {
             SeabirdEvent::PrivateMessage(message) => {
                 self.client
                     .send_private_message(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|u| u.id.as_str())
+                            .ok_or_else(|| format_err!("message missing user_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::SendMessage(_)
+            | SeabirdEvent::SendPrivateMessage(_)
+            | SeabirdEvent::PerformAction(_)
+            | SeabirdEvent::PerformPrivateAction(_) => Err(format_err!("cannot reply to self")),
+        }
+    }
+
+    pub async fn action_reply(&self, text: &str) -> Result<()> {
+        match &self.raw_event {
+            SeabirdEvent::Action(message) => {
+                self.client
+                    .perform_action(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::Message(message) => {
+                self.client
+                    .perform_action(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::Command(message) => {
+                self.client
+                    .perform_action(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::Mention(message) => {
+                self.client
+                    .perform_action(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|s| s.channel_id.as_str())
+                            .ok_or_else(|| format_err!("message missing channel_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::PrivateAction(message) => {
+                self.client
+                    .perform_private_action(
+                        message
+                            .source
+                            .as_ref()
+                            .map(|u| u.id.as_str())
+                            .ok_or_else(|| format_err!("message missing user_id"))?,
+                        text,
+                    )
+                    .await
+            }
+            SeabirdEvent::PrivateMessage(message) => {
+                self.client
+                    .perform_private_action(
                         message
                             .source
                             .as_ref()

@@ -1,3 +1,6 @@
+mod barista;
+pub use self::barista::BaristaPlugin;
+
 // mod bucket;
 // pub use self::bucket::BucketPlugin;
 

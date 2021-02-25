@@ -44,6 +44,7 @@ where
 
 pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
     let supported_plugins = btreeset![
+        "barista",
         "chance",
         "forecast",
         "karma",
@@ -105,6 +106,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
     let mut ret = Vec::new();
 
     // Here we optionally instantiate all supported plugins.
+
+    if config.plugin_enabled("barista") {
+        ret.push(start_plugin::<plugins::BaristaPlugin>(&bot)?);
+    }
 
     if config.plugin_enabled("chance") {
         ret.push(start_plugin::<plugins::ChancePlugin>(&bot)?);
