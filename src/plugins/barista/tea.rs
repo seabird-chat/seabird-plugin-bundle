@@ -84,8 +84,14 @@ impl fmt::Display for VesselType {
     }
 }
 
-// Tea adjectives: brands, places, etc.
-enum TeaAdjective {
+// Tea variants: brands, places, etc.
+//
+// In the previous implementation, these were called adjectives, but neither
+// variant or adjective makes a ton of sense... especially because some of these
+// are mutually exclusive (as an example, Earl Grey and English Breakfast), but
+// some aren't (you could add Vanilla to pretty much any tea). It would be good
+// to revisit later when the relevant variants are actually in use.
+enum TeaVariant {
     Newmans,
     Earl,
     FairTrade,
@@ -106,21 +112,21 @@ enum TeaAdjective {
     Hibiscus,
 }
 
-impl fmt::Display for TeaAdjective {
+impl fmt::Display for TeaVariant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            TeaAdjective::Newmans => f.write_str("Newman's Own"),
-            TeaAdjective::Earl => f.write_str("Earl Grey"),
-            TeaAdjective::FairTrade => f.write_str("fair trade"),
-            TeaAdjective::Homemade => f.write_str("homemade"),
-            TeaAdjective::HomeBrewn => f.write_str("home-brewn"),
-            TeaAdjective::Kangra => f.write_str("Kangra"),
-            TeaAdjective::Irish => f.write_str("Irish-breakfast"),
-            TeaAdjective::English => f.write_str("English-breakfast"),
-            TeaAdjective::Darjeel => f.write_str("Darjeeling"),
-            TeaAdjective::Vanilla => f.write_str("vanilla"),
-            TeaAdjective::Lemongrass => f.write_str("lemongrass"),
-            TeaAdjective::Hibiscus => f.write_str("hibiscus"),
+            TeaVariant::Newmans => f.write_str("Newman's Own"),
+            TeaVariant::Earl => f.write_str("Earl Grey"),
+            TeaVariant::FairTrade => f.write_str("fair trade"),
+            TeaVariant::Homemade => f.write_str("homemade"),
+            TeaVariant::HomeBrewn => f.write_str("home-brewn"),
+            TeaVariant::Kangra => f.write_str("Kangra"),
+            TeaVariant::Irish => f.write_str("Irish-breakfast"),
+            TeaVariant::English => f.write_str("English-breakfast"),
+            TeaVariant::Darjeel => f.write_str("Darjeeling"),
+            TeaVariant::Vanilla => f.write_str("vanilla"),
+            TeaVariant::Lemongrass => f.write_str("lemongrass"),
+            TeaVariant::Hibiscus => f.write_str("hibiscus"),
         }
     }
 }
@@ -283,39 +289,39 @@ impl TeaType {
         }
     }
 
-    fn adjective_choices(&self) -> &[TeaAdjective] {
+    fn variant_choices(&self) -> &[TeaVariant] {
         match *self {
             TeaType::Black => &[
-                TeaAdjective::Irish,
-                TeaAdjective::English,
-                TeaAdjective::Newmans,
-                TeaAdjective::Earl,
-                TeaAdjective::Darjeel,
+                TeaVariant::Irish,
+                TeaVariant::English,
+                TeaVariant::Newmans,
+                TeaVariant::Earl,
+                TeaVariant::Darjeel,
             ],
-            TeaType::Green => &[TeaAdjective::Kangra],
+            TeaType::Green => &[TeaVariant::Kangra],
             TeaType::MatchaGreen => &[],
             TeaType::SenchaGreen => &[],
-            TeaType::White => &[TeaAdjective::Earl],
+            TeaType::White => &[TeaVariant::Earl],
             TeaType::Oolong => &[],
             TeaType::Puer => &[],
-            TeaType::Chai => &[TeaAdjective::Homemade],
-            TeaType::Butter => &[TeaAdjective::Homemade],
-            TeaType::Christmas => &[TeaAdjective::Homemade],
+            TeaType::Chai => &[TeaVariant::Homemade],
+            TeaType::Butter => &[TeaVariant::Homemade],
+            TeaType::Christmas => &[TeaVariant::Homemade],
             TeaType::Rooibos => &[],
-            TeaType::Tulsi => &[TeaAdjective::FairTrade],
-            TeaType::LemonbalmTulsi => &[TeaAdjective::FairTrade],
-            TeaType::Spearmint => &[TeaAdjective::Homemade],
-            TeaType::Peppermint => &[TeaAdjective::Homemade],
-            TeaType::ChocolateMint => &[TeaAdjective::Homemade],
-            TeaType::Mullein => &[TeaAdjective::Homemade],
-            TeaType::LambsEars => &[TeaAdjective::Homemade],
-            TeaType::TumericGinger => &[TeaAdjective::Newmans],
-            TeaType::LemongrassVerbena => &[TeaAdjective::Homemade],
-            TeaType::Lemongrass => &[TeaAdjective::Homemade],
+            TeaType::Tulsi => &[TeaVariant::FairTrade],
+            TeaType::LemonbalmTulsi => &[TeaVariant::FairTrade],
+            TeaType::Spearmint => &[TeaVariant::Homemade],
+            TeaType::Peppermint => &[TeaVariant::Homemade],
+            TeaType::ChocolateMint => &[TeaVariant::Homemade],
+            TeaType::Mullein => &[TeaVariant::Homemade],
+            TeaType::LambsEars => &[TeaVariant::Homemade],
+            TeaType::TumericGinger => &[TeaVariant::Newmans],
+            TeaType::LemongrassVerbena => &[TeaVariant::Homemade],
+            TeaType::Lemongrass => &[TeaVariant::Homemade],
             TeaType::BlackCurrantHibiscus => &[],
-            TeaType::RoastedDandelionRoot => &[TeaAdjective::Homemade],
-            TeaType::DandelionLeafAndRoot => &[TeaAdjective::Homemade],
-            TeaType::Lavender => &[TeaAdjective::Homemade],
+            TeaType::RoastedDandelionRoot => &[TeaVariant::Homemade],
+            TeaType::DandelionLeafAndRoot => &[TeaVariant::Homemade],
+            TeaType::Lavender => &[TeaVariant::Homemade],
         }
     }
 
@@ -434,7 +440,7 @@ pub(crate) fn prepare() -> String {
     let filled_with = FILLED_WITH.choose(&mut rng).unwrap();
 
     let tea_type = TEA_TYPES.choose(&mut rng).unwrap();
-    let tea_adjs = tea_type.adjective_choices();
+    let tea_variants = tea_type.variant_choices();
     let heat = tea_type.heat_choices().choose(&mut rng).unwrap();
 
     let vessel_type = tea_type.vessel_choices().choose(&mut rng).unwrap();
@@ -455,8 +461,8 @@ pub(crate) fn prepare() -> String {
         vessel_type.to_string()
     };
 
-    let tea = if rng.gen_bool(CHANCE_OF_TEA_ADJECTIVE) && tea_adjs.len() > 0 {
-        format!("{} {}", tea_adjs.choose(&mut rng).unwrap(), tea_type)
+    let tea = if rng.gen_bool(CHANCE_OF_TEA_ADJECTIVE) && tea_variants.len() > 0 {
+        format!("{} {}", tea_variants.choose(&mut rng).unwrap(), tea_type)
     } else {
         tea_type.to_string()
     };
