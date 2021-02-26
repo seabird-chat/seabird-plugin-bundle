@@ -68,6 +68,6 @@ impl Plugin for ChancePlugin {
             crate::check_err(&ctx, res).await;
         }
 
-        Err(format_err!("mention plugin lagged"))
+        Err(format_err!("chance plugin lagged"))
     }
 }
