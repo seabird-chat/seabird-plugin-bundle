@@ -15,27 +15,19 @@ const ACTIONS: &[&str] = &["hands", "gives", "passes", "serves"];
 pub struct BaristaPlugin;
 
 impl BaristaPlugin {
-    async fn handle_coffee(&self, ctx: &Arc<Context>) -> Result<()> {
+    async fn handle_coffee(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
+        let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
         let action = ACTIONS.choose(&mut rand::thread_rng()).unwrap();
-        ctx.action_reply(&format!(
-            "{} {} a {}!",
-            action,
-            ctx.sender().unwrap_or("someone"),
-            coffee::prepare()
-        ))
-        .await?;
+        ctx.action_reply(&format!("{} {} a {}!", action, target, coffee::prepare()))
+            .await?;
         Ok(())
     }
 
-    async fn handle_tea(&self, ctx: &Arc<Context>) -> Result<()> {
+    async fn handle_tea(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
+        let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
         let action = ACTIONS.choose(&mut rand::thread_rng()).unwrap();
-        ctx.action_reply(&format!(
-            "{} {} a {}!",
-            action,
-            ctx.sender().unwrap_or("someone"),
-            tea::prepare()
-        ))
-        .await?;
+        ctx.action_reply(&format!("{} {} a {}!", action, target, tea::prepare()))
+            .await?;
         Ok(())
     }
 }
@@ -66,8 +58,8 @@ impl Plugin for BaristaPlugin {
 
         while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
-                Ok(Event::Command("coffee", _)) => self.handle_coffee(&ctx).await,
-                Ok(Event::Command("tea", _)) => self.handle_tea(&ctx).await,
+                Ok(Event::Command("coffee", arg)) => self.handle_coffee(&ctx, arg).await,
+                Ok(Event::Command("tea", arg)) => self.handle_tea(&ctx, arg).await,
                 _ => Ok(()),
             };
 
