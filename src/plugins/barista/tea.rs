@@ -10,7 +10,7 @@ use rand::Rng;
 // Irish => black tea.
 //
 // Some teas are only good at a certain temperature (cold butter tea is
-// disgusting).
+// disgusting, to say the least).
 //
 // Because of that, we can't just choose a random tea, adjective, and vessel; we
 // need to choose the tea first, then the vessel and adjective based on what tea
@@ -61,7 +61,7 @@ impl VesselType {
                 "Tibetan silver tea",
             ],
             VesselType::Samovar => &["antique", "vintage", "brass", "silver"],
-            VesselType::Teacup => &[],
+            VesselType::Teacup => &["porcelain"],
             VesselType::Hohin => &[],
             VesselType::Gaiwan => &["porcelain", "Ruyao"],
             VesselType::Shiboridashi => &["porcelain", "red clay"],
@@ -95,11 +95,12 @@ enum TeaVariant {
     Newmans,
     Earl,
     FairTrade,
+    Organic,
     Homemade,
     #[allow(dead_code)]
     HomeBrewn,
     // Kangra is a location in India where some kinds of green
-    // tea are made.
+    // tea are produced.
     Kangra,
     Irish,
     English,
@@ -118,6 +119,7 @@ impl fmt::Display for TeaVariant {
             TeaVariant::Newmans => f.write_str("Newman's Own"),
             TeaVariant::Earl => f.write_str("Earl Grey"),
             TeaVariant::FairTrade => f.write_str("fair trade"),
+            TeaVariant::Organic => f.write_str("organic"),
             TeaVariant::Homemade => f.write_str("homemade"),
             TeaVariant::HomeBrewn => f.write_str("home-brewn"),
             TeaVariant::Kangra => f.write_str("Kangra"),
@@ -226,6 +228,7 @@ enum TeaType {
     RoastedDandelionRoot,
     DandelionLeafAndRoot,
     Lavender,
+    CinnamonAppleHerbal,
 }
 
 impl TeaType {
@@ -286,6 +289,9 @@ impl TeaType {
                 &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup]
             }
             TeaType::Lavender => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
+            TeaType::CinnamonAppleHerbal => {
+                &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup]
+            }
         }
     }
 
@@ -319,9 +325,10 @@ impl TeaType {
             TeaType::LemongrassVerbena => &[TeaVariant::Homemade],
             TeaType::Lemongrass => &[TeaVariant::Homemade],
             TeaType::BlackCurrantHibiscus => &[],
-            TeaType::RoastedDandelionRoot => &[TeaVariant::Homemade],
+            TeaType::RoastedDandelionRoot => &[TeaVariant::Organic, TeaVariant::Homemade],
             TeaType::DandelionLeafAndRoot => &[TeaVariant::Homemade],
             TeaType::Lavender => &[TeaVariant::Homemade],
+            TeaType::CinnamonAppleHerbal => &[TeaVariant::Organic],
         }
     }
 
@@ -352,6 +359,7 @@ impl TeaType {
             TeaType::RoastedDandelionRoot => ALL.as_ref(),
             TeaType::DandelionLeafAndRoot => ALL.as_ref(),
             TeaType::Lavender => ALL.as_ref(),
+            TeaType::CinnamonAppleHerbal => ALL.as_ref(),
         }
     }
 }
@@ -384,6 +392,7 @@ impl fmt::Display for TeaType {
             TeaType::RoastedDandelionRoot => f.write_str("roasted dandelion root tea"),
             TeaType::DandelionLeafAndRoot => f.write_str("dandelion leaf-and-root tea"),
             TeaType::Lavender => f.write_str("lavender tea"),
+            TeaType::CinnamonAppleHerbal => f.write_str("cinnamon-apple herbal")
         }
     }
 }
@@ -420,6 +429,7 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::RoastedDandelionRoot,
     TeaType::DandelionLeafAndRoot,
     TeaType::Lavender,
+    TeaType::CinnamonAppleHerbal,
 ];
 
 const SIZES: &[&str] = &[
@@ -432,7 +442,6 @@ const FILLED_WITH: &[&str] = &[
     "full of",
     "brimming with",
 ];
-
 
 pub(crate) fn prepare() -> String {
     let mut rng = rand::thread_rng();
