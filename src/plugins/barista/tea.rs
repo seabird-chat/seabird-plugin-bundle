@@ -95,6 +95,7 @@ enum TeaVariant {
     Newmans,
     Earl,
     FairTrade,
+    #[allow(dead_code)]
     Organic,
     Homemade,
     #[allow(dead_code)]
@@ -140,6 +141,7 @@ enum Temperature {
     Cold,
     Chilled,
     IceCold,
+    Freezing,
     // Warm
     Lukewarm,
     Warm,
@@ -151,6 +153,7 @@ enum Temperature {
     Steaming,
     Sweltering,
     ToastyHot,
+    RedHot,
 }
 
 impl fmt::Display for Temperature {
@@ -159,7 +162,8 @@ impl fmt::Display for Temperature {
             Temperature::Iced => f.write_str("iced"),
             Temperature::Cold => f.write_str("cold"),
             Temperature::Chilled => f.write_str("chilled"),
-            Temperature::IceCold => f.write_str("ice cold"),
+            Temperature::IceCold => f.write_str("ice-cold"),
+            Temperature::Freezing => f.write_str("freezing"),
             Temperature::Lukewarm => f.write_str("lukewarm"),
             Temperature::Warm => f.write_str("warm"),
             Temperature::Warmish => f.write_str("warmish"),
@@ -169,6 +173,7 @@ impl fmt::Display for Temperature {
             Temperature::Steaming => f.write_str("steaming"),
             Temperature::Sweltering => f.write_str("sweltering"),
             Temperature::ToastyHot => f.write_str("toasty hot"),
+            Temperature::RedHot => f.write_str("red-hot"),
         }
     }
 }
@@ -179,6 +184,7 @@ const COLD: &[Temperature] = &[
     Temperature::Cold,
     Temperature::Chilled,
     Temperature::IceCold,
+    Temperature::Freezing,
 ];
 static WARM: &[Temperature] = &[
     Temperature::Lukewarm,
@@ -192,6 +198,7 @@ static HOT: &[Temperature] = &[
     Temperature::Steaming,
     Temperature::Sweltering,
     Temperature::ToastyHot,
+    Temperature::RedHot,
 ];
 
 // Note that we use lazy_static so we can compute COLD_HOT, WARM_HOT, and ALL,
@@ -228,7 +235,7 @@ enum TeaType {
     RoastedDandelionRoot,
     DandelionLeafAndRoot,
     Lavender,
-    CinnamonAppleHerbal,
+    CinnamonApple,
 }
 
 impl TeaType {
@@ -289,8 +296,8 @@ impl TeaType {
                 &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup]
             }
             TeaType::Lavender => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
-            TeaType::CinnamonAppleHerbal => {
-                &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup]
+            TeaType::CinnamonApple => {
+                &[VesselType::Teapot, VesselType::Mug]
             }
         }
     }
@@ -325,25 +332,25 @@ impl TeaType {
             TeaType::LemongrassVerbena => &[TeaVariant::Homemade],
             TeaType::Lemongrass => &[TeaVariant::Homemade],
             TeaType::BlackCurrantHibiscus => &[],
-            TeaType::RoastedDandelionRoot => &[TeaVariant::Organic, TeaVariant::Homemade],
+            TeaType::RoastedDandelionRoot => &[TeaVariant::Homemade],
             TeaType::DandelionLeafAndRoot => &[TeaVariant::Homemade],
             TeaType::Lavender => &[TeaVariant::Homemade],
-            TeaType::CinnamonAppleHerbal => &[TeaVariant::Organic],
+            TeaType::CinnamonApple => &[],
         }
     }
 
     fn heat_choices(&self) -> &[Temperature] {
         match *self {
-            TeaType::Black => ALL.as_ref(),
-            TeaType::Green => ALL.as_ref(),
-            TeaType::MatchaGreen => ALL.as_ref(),
+            TeaType::Black => COLD_HOT.as_ref(),
+            TeaType::Green => COLD_HOT.as_ref(),
+            TeaType::MatchaGreen => COLD_HOT.as_ref(),
             TeaType::SenchaGreen => ALL.as_ref(),
             TeaType::White => ALL.as_ref(),
             TeaType::Oolong => WARM_HOT.as_ref(),
             TeaType::Puer => ALL.as_ref(),
             TeaType::Chai => WARM_HOT.as_ref(),
             TeaType::Butter => HOT.as_ref(),
-            TeaType::Christmas => ALL.as_ref(),
+            TeaType::Christmas => HOT.as_ref(),
             TeaType::Rooibos => ALL.as_ref(),
             TeaType::Tulsi => COLD_HOT.as_ref(),
             TeaType::LemonbalmTulsi => COLD_HOT.as_ref(),
@@ -356,10 +363,10 @@ impl TeaType {
             TeaType::LemongrassVerbena => COLD.as_ref(),
             TeaType::Lemongrass => COLD.as_ref(),
             TeaType::BlackCurrantHibiscus => ALL.as_ref(),
-            TeaType::RoastedDandelionRoot => ALL.as_ref(),
+            TeaType::RoastedDandelionRoot => HOT.as_ref(),
             TeaType::DandelionLeafAndRoot => ALL.as_ref(),
             TeaType::Lavender => ALL.as_ref(),
-            TeaType::CinnamonAppleHerbal => ALL.as_ref(),
+            TeaType::CinnamonApple => ALL.as_ref(),
         }
     }
 }
@@ -392,7 +399,7 @@ impl fmt::Display for TeaType {
             TeaType::RoastedDandelionRoot => f.write_str("roasted dandelion root tea"),
             TeaType::DandelionLeafAndRoot => f.write_str("dandelion leaf-and-root tea"),
             TeaType::Lavender => f.write_str("lavender tea"),
-            TeaType::CinnamonAppleHerbal => f.write_str("cinnamon-apple herbal")
+            TeaType::CinnamonApple => f.write_str("cinnamon-apple tea")
         }
     }
 }
@@ -429,7 +436,7 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::RoastedDandelionRoot,
     TeaType::DandelionLeafAndRoot,
     TeaType::Lavender,
-    TeaType::CinnamonAppleHerbal,
+    TeaType::CinnamonApple,
 ];
 
 const SIZES: &[&str] = &[
@@ -442,6 +449,8 @@ const FILLED_WITH: &[&str] = &[
     "full of",
     "brimming with",
 ];
+
+// TODO: add function to look up a tea based on the name
 
 pub(crate) fn prepare() -> String {
     let mut rng = rand::thread_rng();
