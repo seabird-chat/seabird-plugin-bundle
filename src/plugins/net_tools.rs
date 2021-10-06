@@ -41,6 +41,8 @@ fn display_rdata(rdata: RData) -> String {
             },
         ),
         RData::CNAME(name) => format!("CNAME {}", name),
+        RData::HINFO(_hinfo) => unimplemented!(),
+        RData::HTTPS(_https) => unimplemented!(),
         RData::MX(mx) => format!("MX {} {}", mx.preference(), mx.exchange()),
         RData::NAPTR(_naptr) => unimplemented!(),
         RData::NULL(null) => format!(
@@ -78,6 +80,7 @@ fn display_rdata(rdata: RData) -> String {
                 HexSlice::new(sshfp.fingerprint()),
             )
         }
+        RData::SVCB(_svcb) => unimplemented!(),
         RData::TLSA(_tlsa) => unimplemented!(),
         RData::TXT(txt) => format!(
             "TXT {:?}",
@@ -97,7 +100,7 @@ fn display_rdata(rdata: RData) -> String {
 
 impl NetToolsPlugin {
     async fn handle_dig(&self, ctx: &Context, arg: &str) -> Result<()> {
-        let resolver = AsyncResolver::tokio_from_system_conf().await?;
+        let resolver = AsyncResolver::tokio_from_system_conf()?;
 
         // There seems to be a bug in Rust where it can't infer the proper
         // lifetime, so we just convert everything to owned values to avoid

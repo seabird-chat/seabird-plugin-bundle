@@ -1,6 +1,12 @@
+use std::default::Default;
+use time::format_description::{modifier::Weekday, Component, FormatItem};
+
 use crate::utils::{maps, openweathermap};
 
 use crate::prelude::*;
+
+const WEEKDAY_FORMAT: FormatItem<'_> =
+    FormatItem::Component(Component::Weekday(Weekday::default()));
 
 pub struct ForecastPlugin {
     darksky: openweathermap::Client,
@@ -119,17 +125,18 @@ impl ForecastPlugin {
         let mut results = Vec::new();
 
         for day in res.into_iter().skip(1).take(3) {
-            let weekday = day.time.format("%A");
+            let weekday = day.time.format(&WEEKDAY_FORMAT)?;
 
-            let ret = ctx.mention_reply(&format!(
-                "{}: High {:.2}°F, Low {:.2}°F, Humidity {:.0}%. {}.",
-                weekday,
-                day.temperature_high,
-                day.temperature_low,
-                day.humidity,
-                utils::to_sentence_case(&day.summary),
-            ))
-            .await;
+            let ret = ctx
+                .mention_reply(&format!(
+                    "{}: High {:.2}°F, Low {:.2}°F, Humidity {:.0}%. {}.",
+                    weekday,
+                    day.temperature_high,
+                    day.temperature_low,
+                    day.humidity,
+                    utils::to_sentence_case(&day.summary),
+                ))
+                .await;
 
             results.push(ret);
         }

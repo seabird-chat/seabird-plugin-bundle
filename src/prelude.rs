@@ -5,7 +5,7 @@ pub use std::sync::Arc;
 pub use anyhow::{format_err, Context as AnyhowContext};
 pub use async_trait::async_trait;
 pub use itertools::Itertools;
-pub use tokio::stream::{Stream, StreamExt};
+pub use tokio_stream::{Stream, StreamExt};
 pub use unicode_segmentation::UnicodeSegmentation;
 
 pub use crate::client::{Client, ClientConfig, Context, Event};
