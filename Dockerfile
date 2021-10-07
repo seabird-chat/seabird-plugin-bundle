@@ -24,7 +24,7 @@ RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird-p
 FROM debian:buster-slim
 ENV RUST_LOG=info
 WORKDIR /usr/src/seabird-rs
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/* && mkdir migrations
+RUN mkdir migrations
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 COPY --from=builder /usr/local/cargo/bin/cargo-sqlx /usr/local/bin/cargo-sqlx
 COPY --from=builder /usr/local/bin/seabird-plugin-bundle /usr/local/bin/seabird-plugin-bundle
