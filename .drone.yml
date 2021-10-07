@@ -1,0 +1,13 @@
+pipeline:
+  test:
+    image: rust
+    commands:
+      - cargo build
+      - cargo test
+
+  publish:
+    image: plugins/docker
+    repo: seabirdchat/seabird-plugin-bundle
+    secrets: [ docker_username, docker_password ]
+    when:
+      branch: main
