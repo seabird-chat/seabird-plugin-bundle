@@ -2,8 +2,8 @@ pipeline:
   test:
     image: rust
     commands:
-      - cargo build
-      - cargo test
+      - cargo build --no-default-features
+      - cargo test --no-default-features
 
   publish:
     image: plugins/docker
