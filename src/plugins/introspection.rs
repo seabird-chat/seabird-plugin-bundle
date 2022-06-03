@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::fmt::Write;
 
 use git_version::git_version;
