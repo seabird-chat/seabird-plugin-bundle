@@ -5,7 +5,7 @@ use crate::prelude::*;
 use crate::utils::HexSlice;
 
 use trust_dns_resolver::{
-    proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData, proto::xfer::DnsRequestOptions,
+    proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData,
     AsyncResolver,
 };
 
@@ -47,7 +47,7 @@ fn display_rdata(rdata: RData) -> String {
         RData::NAPTR(_naptr) => unimplemented!(),
         RData::NULL(null) => format!(
             "NULL {}",
-            String::from_utf8_lossy(null.anything().unwrap_or(b"")),
+            String::from_utf8_lossy(null.anything()),
         ),
         RData::NS(name) => format!("NS {}", name),
         RData::OPENPGPKEY(_key) => unimplemented!(),
@@ -92,9 +92,9 @@ fn display_rdata(rdata: RData) -> String {
         RData::Unknown { code, rdata } => format!(
             "UNKNOWN ({}) {}",
             code,
-            String::from_utf8_lossy(rdata.anything().unwrap_or(b"")),
+            String::from_utf8_lossy(rdata.anything()),
         ),
-        RData::ZERO => "ZERO".to_string(),
+        _ => "UNKNOWN".to_string(),
     }
 }
 
@@ -116,7 +116,6 @@ impl NetToolsPlugin {
                 .lookup(
                     name,
                     record_type.to_uppercase().parse()?,
-                    DnsRequestOptions::default(),
                 )
                 .await?
                 .into_iter()

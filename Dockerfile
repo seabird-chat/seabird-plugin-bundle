@@ -1,11 +1,11 @@
-FROM rust:1.61 as builder
+FROM rust:1.67 as builder
 WORKDIR /usr/src/seabird-rs
 
 # NOTE: tonic_build uses rustfmt to properly format the output files and give
 # better errors.
 RUN rustup component add rustfmt
 
-RUN cargo install --version=0.5.13 sqlx-cli
+RUN cargo install --version=0.6.2 sqlx-cli
 
 # Copy over only the files which specify dependencies
 COPY Cargo.toml Cargo.lock ./
