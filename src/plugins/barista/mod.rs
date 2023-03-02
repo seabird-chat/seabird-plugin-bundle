@@ -30,6 +30,13 @@ impl BaristaPlugin {
             .await?;
         Ok(())
     }
+    async fn handle_pop(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
+        let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
+        let action = ACTIONS.choose(&mut rand::thread_rng()).unwrap();
+        ctx.action_reply(&format!("{} {} a {}!", action, target, pop::prepare()))
+            .await?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -50,6 +57,11 @@ impl Plugin for BaristaPlugin {
                 short_help: "usage: tea. Get some tea from the bot.".to_string(),
                 full_help: "a barista to give you tea.".to_string(),
             },
+            CommandMetadata {
+                name: "pop".to_string(),
+                short_help: "usage: pop. Get some pop from the bot.".to_string(),
+                full_help: "a barista to give you pop.".to_string(),
+            },
         ]
     }
 
@@ -60,6 +72,7 @@ impl Plugin for BaristaPlugin {
             let res = match ctx.as_event() {
                 Ok(Event::Command("coffee", arg)) => self.handle_coffee(&ctx, arg).await,
                 Ok(Event::Command("tea", arg)) => self.handle_tea(&ctx, arg).await,
+                Ok(Event::Command("pop", arg)) => self.handle_pop(&ctx, arg).await,
                 _ => Ok(()),
             };
 
