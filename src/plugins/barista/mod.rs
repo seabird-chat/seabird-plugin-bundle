@@ -8,6 +8,7 @@ use rand::seq::SliceRandom;
 use crate::prelude::*;
 
 mod coffee;
+mod pop;
 mod tea;
 
 const ACTIONS: &[&str] = &["hands", "gives", "passes", "serves"];
@@ -30,6 +31,7 @@ impl BaristaPlugin {
             .await?;
         Ok(())
     }
+
     async fn handle_pop(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
         let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
         let action = ACTIONS.choose(&mut rand::thread_rng()).unwrap();
