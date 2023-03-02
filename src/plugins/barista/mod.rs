@@ -62,6 +62,11 @@ impl Plugin for BaristaPlugin {
                 short_help: "usage: pop. Get some pop from the bot.".to_string(),
                 full_help: "a barista to give you pop.".to_string(),
             },
+            CommandMetadata {
+                name: "soda".to_string(),
+                short_help: "usage: soda. Get some soda from the bot.".to_string(),
+                full_help: "it's the same as pop, but not.".to_string(),
+            },
         ]
     }
 
@@ -73,6 +78,7 @@ impl Plugin for BaristaPlugin {
                 Ok(Event::Command("coffee", arg)) => self.handle_coffee(&ctx, arg).await,
                 Ok(Event::Command("tea", arg)) => self.handle_tea(&ctx, arg).await,
                 Ok(Event::Command("pop", arg)) => self.handle_pop(&ctx, arg).await,
+                Ok(Event::Command("soda", arg)) => self.handle_pop(&ctx, arg).await,
                 _ => Ok(()),
             };
 
