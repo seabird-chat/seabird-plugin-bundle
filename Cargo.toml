@@ -4,10 +4,6 @@ version = "0.1.0"
 authors = ["Kaleb Elwert <belak@coded.io>"]
 edition = "2021"
 
-[features]
-default = ["rustfmt"]
-rustfmt = ["seabird/rustfmt"]
-
 [dependencies]
 # Core dependencies
 anyhow = "1.0"
@@ -38,4 +34,4 @@ git-version = "0.3"
 unicode-segmentation = "1.10"
 
 # Client library
-seabird = { version = "0.2.0-alpha.4", default-features = false }
+seabird = "0.3.0-alpha.4"
