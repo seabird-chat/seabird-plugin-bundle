@@ -35,5 +35,5 @@ COPY --from=builder /usr/local/cargo/bin/cargo-sqlx /usr/local/bin/cargo-sqlx
 
 COPY --from=builder /usr/local/bin/seabird-* /usr/local/bin/seabird-plugin-bundle
 COPY entrypoint.sh /usr/local/bin/seabird-entrypoint.sh
-COPY --from=builder /usr/src/seabird-rs/migrations/* /usr/src/seabird-rs/migrations/
+COPY --from=builder /usr/src/app/migrations/* /usr/src/app/migrations/
 CMD ["/usr/local/bin/seabird-entrypoint.sh"]
