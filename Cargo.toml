@@ -34,4 +34,4 @@ git-version = "0.3"
 unicode-segmentation = "1.10"
 
 # Client library
-seabird = "0.3.0-alpha.4"
+seabird = "0.3.0-alpha.1"
