@@ -33,7 +33,7 @@ RUN mkdir migrations
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 COPY --from=builder /usr/local/cargo/bin/cargo-sqlx /usr/local/bin/cargo-sqlx
 
-COPY --from=builder /usr/local/bin/seabird-* /usr/local/bin/seabird-plugin-bundle
+COPY --from=builder /usr/local/bin/seabird-* /usr/local/bin/
 COPY entrypoint.sh /usr/local/bin/seabird-entrypoint.sh
 COPY --from=builder /usr/src/app/migrations/* /usr/src/app/migrations/
 CMD ["/usr/local/bin/seabird-entrypoint.sh"]
