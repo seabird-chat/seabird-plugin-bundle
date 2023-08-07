@@ -31,7 +31,7 @@ async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
 #[tokio::main]
 async fn main() -> error::Result<()> {
     // Try to load dotenv before loading the logger or trying to set defaults.
-    let env_res = dotenv::dotenv();
+    let env_res = dotenvy::dotenv();
 
     // There's a little bit of an oddity here, since we want to set it if it
     // hasn't already been set, but we want this done before the logger is loaded.
@@ -50,22 +50,22 @@ async fn main() -> error::Result<()> {
 
     // Load our config from command line arguments
     let config = client::ClientConfig::new(
-        dotenv::var("SEABIRD_HOST")
+        dotenvy::var("SEABIRD_HOST")
             .context("Missing $SEABIRD_HOST. You must specify a Seabird host.")?,
-        dotenv::var("SEABIRD_TOKEN")
+        dotenvy::var("SEABIRD_TOKEN")
             .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
-        dotenv::var("DATABASE_URL")
+        dotenvy::var("DATABASE_URL")
             .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
-        dotenv::var("DATABASE_POOL_SIZE")
+        dotenvy::var("DATABASE_POOL_SIZE")
             .unwrap_or_else(|_| "5".to_string())
             .parse()
             .context("Invalid $DATABASE_POOL_SIZE")?,
-        dotenv::var("SEABIRD_ENABLED_PLUGINS")
+        dotenvy::var("SEABIRD_ENABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
             .split_terminator(',')
             .map(|s| s.to_string())
             .collect(),
-        dotenv::var("SEABIRD_DISABLED_PLUGINS")
+        dotenvy::var("SEABIRD_DISABLED_PLUGINS")
             .unwrap_or_else(|_| "".to_string())
             .split_terminator(',')
             .map(|s| s.to_string())

@@ -8,28 +8,28 @@ edition = "2021"
 # Core dependencies
 anyhow = "1.0"
 async-trait = "0.1"
-bytes = "1.0"
-dotenv = "0.15"
+bytes = "1.4"
+dotenvy = "0.15"
 futures = "0.3"
 log = "0.4"
 maplit = "1.0"
-pretty_env_logger = "0.4"
-tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
-tokio-stream = "0.1.0"
+pretty_env_logger = "0.5"
+tokio = { version = "1.29", features = ["macros", "rt", "sync", "time"] }
+tokio-stream = "0.1"
 
 # Plugin dependencies
 http = "0.2"
-itertools = "0.10"
+itertools = "0.11"
 lazy_static = "1.4"
 rand = "0.8"
-regex = "1.7"
+regex = "1.9"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "gzip", "json", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
-sqlx = { version = "0.6.0", default-features = false, features = ["runtime-tokio-rustls", "macros", "migrate", "postgres", "offline"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "macros", "migrate", "postgres"] }
 time = { version = "0.3", features = ["formatting"] }
 tokio-postgres = "0.7"
 trust-dns-resolver = { version = "0.22", features = ["tokio-runtime"] }
-url = "2.3"
+url = "2.4"
 git-version = "0.3"
 unicode-segmentation = "1.10"
 

@@ -1,4 +1,3 @@
-use std::default::Default;
 use time::format_description::{modifier::Weekday, Component, FormatItem};
 
 use crate::utils::{maps, openweathermap};
@@ -250,12 +249,12 @@ UPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
 impl Plugin for ForecastPlugin {
     fn new_from_env() -> Result<Self> {
         Ok(ForecastPlugin::new(
-            dotenv::var("OPENWEATHERMAP_API_KEY").map_err(|_| {
+            dotenvy::var("OPENWEATHERMAP_API_KEY").map_err(|_| {
                 anyhow::format_err!(
                     "Missing $OPENWEATHERMAP_API_KEY. Required by the \"forecast\" plugin."
                 )
             })?,
-            dotenv::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
+            dotenvy::var("GOOGLE_MAPS_API_KEY").map_err(|_| {
                 anyhow::format_err!(
                     "Missing $GOOGLE_MAPS_API_KEY. Required by the \"forecast\" plugin."
                 )
