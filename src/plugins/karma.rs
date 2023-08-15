@@ -29,10 +29,16 @@ impl Karma {
     }
 
     async fn create_or_update(conn: &sqlx::PgPool, name: &str, score: i32) -> Result<Self> {
+        let target = sqlx::query!("SELECT target FROM karma_alias WHERE name=$1;", name)
+            .map(|row| row.target)
+            .fetch_optional(conn)
+            .await?
+            .unwrap_or_else(|| name.to_string());
+
         sqlx::query!(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
 ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
-            name,
+            target,
             score
         )
         .execute(conn)

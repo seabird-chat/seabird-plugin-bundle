@@ -67,6 +67,26 @@
     },
     "query": "SELECT nick, station FROM noaa_location WHERE nick=$1;"
   },
+  "84c4199d51b1af556c73cbfefecdb3284354f8fcc30f4c578e4e5d28b8241949": {
+    "describe": {
+      "columns": [
+        {
+          "name": "target",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT target FROM karma_alias WHERE name=$1;"
+  },
   "9d3cfd4080385242f57cfa67b4ae94fe4eb066c622f8cb13675b14922925c328": {
     "describe": {
       "columns": [],
