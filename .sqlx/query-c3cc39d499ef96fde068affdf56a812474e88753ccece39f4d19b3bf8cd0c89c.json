@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO karma (name, score) VALUES ($1, $2)\nON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c3cc39d499ef96fde068affdf56a812474e88753ccece39f4d19b3bf8cd0c89c"
+}

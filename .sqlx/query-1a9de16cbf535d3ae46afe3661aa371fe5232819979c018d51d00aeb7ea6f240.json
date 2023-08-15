@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO forecast_location (nick, address, lat, lng) VALUES ($1, $2, $3, $4)\nON CONFLICT (nick) DO\nUPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1a9de16cbf535d3ae46afe3661aa371fe5232819979c018d51d00aeb7ea6f240"
+}
