@@ -281,11 +281,7 @@ impl Context {
     }
 
     pub fn is_private(&self) -> bool {
-        if let SeabirdEvent::PrivateMessage(_) = self.raw_event {
-            return true;
-        } else {
-            return false;
-        }
+        matches!(self.raw_event, SeabirdEvent::PrivateMessage(_))
     }
 
     pub fn sender(&self) -> Option<&str> {

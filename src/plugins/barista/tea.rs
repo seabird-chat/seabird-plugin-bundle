@@ -1,4 +1,5 @@
 use std::fmt;
+use std::vec::Vec;
 
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -179,31 +180,31 @@ impl fmt::Display for Temperature {
 }
 
 // Temperature of tea.
-const COLD: &[Temperature] = &[
-    Temperature::Iced,
-    Temperature::Cold,
-    Temperature::Chilled,
-    Temperature::IceCold,
-    Temperature::Freezing,
-];
-static WARM: &[Temperature] = &[
-    Temperature::Lukewarm,
-    Temperature::Warm,
-    Temperature::Warmish,
-    Temperature::RoomTemperature,
-];
-static HOT: &[Temperature] = &[
-    Temperature::Boiling,
-    Temperature::Scalding,
-    Temperature::Steaming,
-    Temperature::Sweltering,
-    Temperature::ToastyHot,
-    Temperature::RedHot,
-];
-
+//
 // Note that we use lazy_static so we can compute COLD_HOT, WARM_HOT, and ALL,
 // otherwise there's a ton of copying going on.
 lazy_static::lazy_static! {
+    static ref COLD: Vec<Temperature> = vec![
+        Temperature::Iced,
+        Temperature::Cold,
+        Temperature::Chilled,
+        Temperature::IceCold,
+        Temperature::Freezing,
+    ];
+    static ref WARM: Vec<Temperature> = vec![
+        Temperature::Lukewarm,
+        Temperature::Warm,
+        Temperature::Warmish,
+        Temperature::RoomTemperature,
+    ];
+    static ref HOT: Vec<Temperature> = vec![
+        Temperature::Boiling,
+        Temperature::Scalding,
+        Temperature::Steaming,
+        Temperature::Sweltering,
+        Temperature::ToastyHot,
+        Temperature::RedHot,
+    ];
     static ref COLD_HOT: Vec<Temperature> = COLD.iter().chain(HOT.iter()).cloned().collect();
     static ref WARM_HOT: Vec<Temperature> = WARM.iter().chain(HOT.iter()).cloned().collect();
     static ref ALL: Vec<Temperature> = COLD.iter().chain(WARM.iter()).chain(HOT.iter()).cloned().collect();
@@ -296,9 +297,7 @@ impl TeaType {
                 &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup]
             }
             TeaType::Lavender => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
-            TeaType::CinnamonApple => {
-                &[VesselType::Teapot, VesselType::Mug]
-            }
+            TeaType::CinnamonApple => &[VesselType::Teapot, VesselType::Mug],
         }
     }
 
@@ -399,7 +398,7 @@ impl fmt::Display for TeaType {
             TeaType::RoastedDandelionRoot => f.write_str("roasted dandelion root tea"),
             TeaType::DandelionLeafAndRoot => f.write_str("dandelion leaf-and-root tea"),
             TeaType::Lavender => f.write_str("lavender tea"),
-            TeaType::CinnamonApple => f.write_str("cinnamon-apple tea")
+            TeaType::CinnamonApple => f.write_str("cinnamon-apple tea"),
         }
     }
 }
@@ -464,7 +463,7 @@ pub(crate) fn prepare() -> String {
     let vessel_type = tea_type.vessel_choices().choose(&mut rng).unwrap();
     let vessel_adjs = vessel_type.adjective_choices();
 
-    let vessel = if rng.gen_bool(CHANCE_OF_VESSEL_ADJECTIVE) && vessel_adjs.len() > 0 {
+    let vessel = if rng.gen_bool(CHANCE_OF_VESSEL_ADJECTIVE) && !vessel_adjs.is_empty() {
         if rng.gen_bool(CHANCE_OF_VESSEL_SIZE) {
             format!(
                 "{} {} {}",
@@ -479,7 +478,7 @@ pub(crate) fn prepare() -> String {
         vessel_type.to_string()
     };
 
-    let tea = if rng.gen_bool(CHANCE_OF_TEA_ADJECTIVE) && tea_variants.len() > 0 {
+    let tea = if rng.gen_bool(CHANCE_OF_TEA_ADJECTIVE) && !tea_variants.is_empty() {
         format!("{} {}", tea_variants.choose(&mut rng).unwrap(), tea_type)
     } else {
         tea_type.to_string()

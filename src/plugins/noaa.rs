@@ -66,10 +66,8 @@ impl NoaaPlugin {
         .await?;
 
         let _ = lines.next();
-        for line in lines {
-            if let Ok(line) = line {
-                ctx.mention_reply(&line.trim()).await?;
-            }
+        for line in lines.flatten() {
+            ctx.mention_reply(line.trim()).await?;
         }
 
         Ok(())

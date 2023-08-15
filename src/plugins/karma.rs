@@ -44,7 +44,7 @@ ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
         .execute(conn)
         .await?;
 
-        Karma::get_by_name(conn, &name).await
+        Karma::get_by_name(conn, name).await
     }
 }
 
@@ -158,7 +158,7 @@ impl KarmaPlugin {
 
         // Loop through all captures, adding them to the output.
         for capture in captures {
-            let cleaned_name = Karma::sanitize_name(&capture[1].trim_matches('"'));
+            let cleaned_name = Karma::sanitize_name(capture[1].trim_matches('"'));
 
             match parse_karma_change(&capture[2]) {
                 Ok(change) => {

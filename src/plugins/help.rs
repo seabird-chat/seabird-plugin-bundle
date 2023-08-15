@@ -22,8 +22,7 @@ impl HelpPlugin {
             },
             None => {
                 // Print all available commands
-                let mut commands: Vec<String> =
-                    response.commands.into_iter().map(|(k, _)| k).collect();
+                let mut commands: Vec<String> = response.commands.into_keys().collect();
                 commands.sort();
 
                 ctx.mention_reply(&format!("available commands: {}", commands.join(", ")))
