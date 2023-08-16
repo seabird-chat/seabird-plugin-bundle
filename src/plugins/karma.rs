@@ -12,8 +12,16 @@ pub struct Karma {
 }
 
 impl Karma {
-    fn sanitize_name(name: &str) -> String {
-        name.to_lowercase()
+    async fn sanitize_name(conn: &sqlx::PgPool, name: &str) -> Result<String> {
+        let name = name.to_lowercase();
+
+        Ok(
+            sqlx::query!("SELECT target FROM karma_alias WHERE name=$1;", name)
+                .map(|row| row.target)
+                .fetch_optional(conn)
+                .await?
+                .unwrap_or_else(|| name.to_string()),
+        )
     }
 
     async fn get_by_name(conn: &sqlx::PgPool, name: &str) -> Result<Self> {
@@ -29,16 +37,10 @@ impl Karma {
     }
 
     async fn create_or_update(conn: &sqlx::PgPool, name: &str, score: i32) -> Result<Self> {
-        let target = sqlx::query!("SELECT target FROM karma_alias WHERE name=$1;", name)
-            .map(|row| row.target)
-            .fetch_optional(conn)
-            .await?
-            .unwrap_or_else(|| name.to_string());
-
         sqlx::query!(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
 ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
-            target,
+            name,
             score
         )
         .execute(conn)
@@ -137,7 +139,7 @@ impl KarmaPlugin {
 
 impl KarmaPlugin {
     async fn handle_karma(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
-        let name = Karma::sanitize_name(arg);
+        let name = Karma::sanitize_name(&ctx.get_db(), arg).await?;
         let karma = Karma::get_by_name(&ctx.get_db(), &name).await?;
 
         ctx.mention_reply(&format!("{}'s karma is {}", arg, karma.score))
@@ -158,7 +160,8 @@ impl KarmaPlugin {
 
         // Loop through all captures, adding them to the output.
         for capture in captures {
-            let cleaned_name = Karma::sanitize_name(capture[1].trim_matches('"'));
+            let cleaned_name =
+                Karma::sanitize_name(&ctx.get_db(), capture[1].trim_matches('"')).await?;
 
             match parse_karma_change(&capture[2]) {
                 Ok(change) => {
@@ -187,7 +190,7 @@ impl KarmaPlugin {
             write!(line, "{}'s karma is now {}", name, karma.score)?;
 
             if raw_change != change {
-                line.push_str(". Buzzkill Mode (tm) enforced a limit of 5");
+                line.push_str(". Buzzkill Mode™ enforced a limit of 5");
             } else if raw_change == 0 {
                 line.push_str(". Well done. Nothing happened.");
             }
