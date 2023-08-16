@@ -4,27 +4,22 @@ use std::time::Instant;
 use crate::prelude::*;
 
 pub struct NoaaPlugin {
-    base_url: &'static str,
+    base_metar_url: &'static str,
+    base_taf_url: &'static str,
 }
 
 impl NoaaPlugin {
     pub fn new() -> Self {
         NoaaPlugin {
-            base_url: "https://tgftp.nws.noaa.gov/data",
+            base_metar_url: "https://tgftp.nws.noaa.gov/data/observations/metar/stations",
+            base_taf_url: "https://tgftp.nws.noaa.gov/data/forecasts/taf/stations",
         }
     }
 }
 
 impl NoaaPlugin {
     async fn lookup_metar(&self, ctx: &Context, station: String) -> Result<()> {
-        let mut station = station;
-        station.make_ascii_uppercase();
-
-        let mut lines = lines_from_url(&format!(
-            "{}/observations/metar/stations/{}.TXT",
-            self.base_url, station
-        ))
-        .await?;
+        let mut lines = lines_from_url(self.base_metar_url, &station).await?;
 
         // Only set the station if a request was successful.
         NoaaLocation::set_for_name(
@@ -47,14 +42,7 @@ impl NoaaPlugin {
     }
 
     async fn lookup_taf(&self, ctx: &Context, station: String) -> Result<()> {
-        let mut station = station;
-        station.make_ascii_uppercase();
-
-        let mut lines = lines_from_url(&format!(
-            "{}/forecasts/taf/stations/{}.TXT",
-            self.base_url, station
-        ))
-        .await?;
+        let mut lines = lines_from_url(self.base_taf_url, &station).await?;
 
         // Only set the station if a request was successful.
         NoaaLocation::set_for_name(
@@ -105,17 +93,38 @@ ON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
     }
 }
 
-async fn lines_from_url(url: &str) -> Result<std::io::Lines<std::io::Cursor<String>>> {
-    let start = Instant::now();
-    let data = reqwest::get(url).await?.error_for_status()?.text().await?;
+async fn lines_from_url(
+    base_url: &str,
+    station: &str,
+) -> Result<std::io::Lines<std::io::Cursor<String>>> {
+    let mut station = station.to_string();
+    station.make_ascii_uppercase();
 
-    debug!(
-        "Got station information from \"{}\" in {}ms",
-        url,
-        start.elapsed().as_millis()
-    );
+    for prefix in &["", "K", "W"] {
+        let url = format!("{}/{}{}.TXT", base_url, prefix, station);
 
-    Ok(std::io::Cursor::new(data).lines())
+        let start = Instant::now();
+        let resp = reqwest::get(&url).await?;
+        if resp.status() != reqwest::StatusCode::OK {
+            info!(
+                "Station information at \"{}\" returned status {}",
+                url,
+                resp.status(),
+            );
+            continue;
+        }
+        let data = resp.text().await?;
+
+        debug!(
+            "Got station information from \"{}\" in {}ms",
+            url,
+            start.elapsed().as_millis()
+        );
+
+        return Ok(std::io::Cursor::new(data).lines());
+    }
+
+    Err(format_err!("Failed to get station data"))
 }
 
 async fn extract_station(ctx: &Context, arg: Option<&str>) -> Result<Option<String>> {
@@ -134,12 +143,8 @@ async fn extract_station(ctx: &Context, arg: Option<&str>) -> Result<Option<Stri
 impl NoaaPlugin {
     async fn handle_metar(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
         match extract_station(ctx, arg).await? {
-            Some(station) => {
-                self.lookup_metar(ctx, station).await?;
-            }
-            None => {
-                ctx.mention_reply("Missing station argument.").await?;
-            }
+            Some(station) => self.lookup_metar(ctx, station).await?,
+            None => ctx.mention_reply("Missing station argument.").await?,
         }
 
         Ok(())
@@ -147,12 +152,8 @@ impl NoaaPlugin {
 
     async fn handle_taf(&self, ctx: &Context, arg: Option<&str>) -> Result<()> {
         match extract_station(ctx, arg).await? {
-            Some(station) => {
-                self.lookup_taf(ctx, station).await?;
-            }
-            None => {
-                ctx.mention_reply("Missing station argument.").await?;
-            }
+            Some(station) => self.lookup_taf(ctx, station).await?,
+            None => ctx.mention_reply("Missing station argument.").await?,
         }
 
         Ok(())
