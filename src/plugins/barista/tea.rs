@@ -54,7 +54,7 @@ impl VesselType {
                 "porcelain",
                 "jasperware",
                 "wooden",
-                "Indian-made clay mug",
+                "Indian-made clay",
             ],
             VesselType::Bowl => &[
                 "burl wood-and-silver tea",
