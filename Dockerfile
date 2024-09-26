@@ -1,4 +1,4 @@
-FROM rust:1.68-bullseye as builder
+FROM rust:1.81-bullseye as builder
 WORKDIR /usr/src/app
 
 # Workaround to allow arm64 builds to work properly
@@ -8,7 +8,7 @@ ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 # because it greatly cuts down on build times. This may change in the future.
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 
-RUN cargo install --version=0.6.2 sqlx-cli
+RUN cargo install --version=0.8.2 sqlx-cli
 
 # Copy over only the files which specify dependencies
 COPY ./Cargo.toml ./Cargo.lock ./

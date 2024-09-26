@@ -2,13 +2,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils }:
@@ -27,7 +21,7 @@
             ];
 
             nativeBuildInputs = [
-              (pkgs.rust-bin.stable."1.71.1".default.override {
+              (pkgs.rust-bin.stable."1.81.0".default.override {
                 extensions = ["rust-src"];
               })
               pkgs.rust-analyzer
