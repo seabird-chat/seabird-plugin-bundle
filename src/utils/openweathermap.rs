@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::prelude::*;
 
-const BASE_URL: &str = "https://api.openweathermap.org/data/2.5";
+const BASE_URL: &str = "https://api.openweathermap.org/data/3.0";
 
 pub struct Client {
     api_key: String,
@@ -25,6 +25,7 @@ impl Client {
             ("lat", format!("{:.16}", lat)),
             ("lon", format!("{:.16}", lng)),
             ("units", "imperial".to_string()),
+            ("exclude", "minutely,hourly,alerts".to_string()),
         ];
 
         let res: OneCallResponse = self
@@ -48,6 +49,7 @@ impl Client {
             ("lat", format!("{:.16}", lat)),
             ("lon", format!("{:.16}", lng)),
             ("units", "imperial".to_string()),
+            ("exclude", "minutely,hourly,alerts".to_string()),
         ];
 
         let res: OneCallResponse = self
