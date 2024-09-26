@@ -4,7 +4,7 @@ use std::fmt::Write;
 use crate::prelude::*;
 use crate::utils::HexSlice;
 
-use trust_dns_resolver::{
+use hickory_resolver::{
     proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData,
     AsyncResolver,
 };
