@@ -68,7 +68,7 @@ impl VesselType {
             VesselType::Hohin => &[],
             VesselType::Gaiwan => &["porcelain", "Ruyao"],
             VesselType::Shiboridashi => &["porcelain", "red clay"],
-            VesselType::Cup => &["plastic", "sippy"],
+            VesselType::Cup => &["plastic", "sippy", "paper"],
             VesselType::Glass => &[],
         }
     }
@@ -538,6 +538,10 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::DandelionLeafAndRoot,
     TeaType::Lavender,
     TeaType::CinnamonApple,
+    TeaType::Milk,
+    TeaType::Boba,
+    TeaType::MapleSyrup,
+    TeaType::Hibiscus,
     TeaType::Gossip,
     TeaType::Testosterone,
 ];
