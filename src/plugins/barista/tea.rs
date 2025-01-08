@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::vec::Vec;
 
@@ -25,6 +26,9 @@ const CHANCE_OF_VESSEL_SIZE: f64 = 0.90;
 
 // This is the chance that an adjective will preceed the vessel.
 const CHANCE_OF_VESSEL_ADJECTIVE: f64 = 0.85;
+
+// This is the chance that the tea will be decaf (only if it is a caffeinated type already).
+const CHANCE_OF_DECAF: f64 = 0.1;
 
 // Vessels for tea.
 enum VesselType {
@@ -119,7 +123,6 @@ enum TeaVariant {
     Lemongrass,
     #[allow(dead_code)]
     Herbal,
-    Decaf,
     Creamy,
     Gooey,
 }
@@ -140,7 +143,6 @@ impl fmt::Display for TeaVariant {
             TeaVariant::Vanilla => f.write_str("vanilla"),
             TeaVariant::Lemongrass => f.write_str("lemongrass"),
             TeaVariant::Herbal => f.write_str("herbal"),
-            TeaVariant::Decaf => f.write_str("decaf"),
             TeaVariant::Creamy => f.write_str("creamy"),
             TeaVariant::Gooey => f.write_str("gooey"),
         }
@@ -235,6 +237,7 @@ enum TeaType {
     SenchaGreen,
     White,
     Oolong,
+    YerbaMate,
     Puer,
     Chai,
     Butter,
@@ -288,6 +291,7 @@ impl TeaType {
             ],
             TeaType::White => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
             TeaType::Oolong => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
+            TeaType::YerbaMate => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
             TeaType::Puer => &[
                 VesselType::Shiboridashi,
                 VesselType::Teapot,
@@ -369,6 +373,7 @@ impl TeaType {
             TeaType::SenchaGreen => &[],
             TeaType::White => &[TeaVariant::Earl],
             TeaType::Oolong => &[],
+            TeaType::YerbaMate => &[],
             TeaType::Puer => &[],
             TeaType::Chai => &[TeaVariant::Homemade],
             TeaType::Butter => &[TeaVariant::Homemade],
@@ -436,6 +441,7 @@ impl TeaType {
             TeaType::SenchaGreen => ALL.as_ref(),
             TeaType::White => ALL.as_ref(),
             TeaType::Oolong => WARM_HOT.as_ref(),
+            TeaType::YerbaMate => HOT.as_ref(),
             TeaType::Puer => ALL.as_ref(),
             TeaType::Chai => WARM_HOT.as_ref(),
             TeaType::Butter => HOT.as_ref(),
@@ -475,6 +481,7 @@ impl fmt::Display for TeaType {
             TeaType::SenchaGreen => f.write_str("sencha green tea"),
             TeaType::White => f.write_str("white tea"),
             TeaType::Oolong => f.write_str("oolong tea"),
+            TeaType::YerbaMate => f.write_str("yerba mate tea"),
             TeaType::Puer => f.write_str("pu'er"),
             TeaType::Chai => f.write_str("chai"),
             TeaType::Butter => f.write_str("butter tea"),
@@ -518,6 +525,7 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::SenchaGreen,
     TeaType::White,
     TeaType::Oolong,
+    TeaType::YerbaMate,
     TeaType::Puer,
     TeaType::Chai,
     TeaType::Butter,
@@ -545,6 +553,18 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::Gossip,
     TeaType::Testosterone,
 ];
+
+lazy_static::lazy_static! {
+    static ref CAFFEINATED_TYPES: HashSet<TeaType> = {
+        HashSet::from([
+            TeaType::Black,
+            TeaType::Green,
+            TeaType::Oolong,
+            TeaType::White,
+            TeaType::YerbaMate,
+        ])
+    };
+}
 
 const SIZES: &[&str] = &[
     "large", "small", "medium", "tall", "wide", "big", "100ml", "giant", "tiny", "thicc",
@@ -591,6 +611,12 @@ pub(crate) fn prepare() -> String {
         format!("{} {}", tea_variants.choose(&mut rng).unwrap(), tea_type)
     } else {
         tea_type.to_string()
+    };
+
+    tea = if CAFFEINATED_TYPES.contains(tea_type) && rng.gen_bool(CHANCE_OF_DECAF) {
+        format!("decaf {}", tea)
+    } else {
+        tea
     };
 
     format!("{} {} {} {}", vessel, filled_with, heat, tea)
