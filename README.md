@@ -4,6 +4,7 @@
 
 - Rust 1.42
 - Postgres
+- Protobuf
 
 ## Settings
 

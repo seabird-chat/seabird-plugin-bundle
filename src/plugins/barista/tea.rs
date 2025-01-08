@@ -230,6 +230,7 @@ lazy_static::lazy_static! {
     static ref ALL: Vec<Temperature> = COLD.iter().chain(WARM.iter()).chain(HOT.iter()).cloned().collect();
 }
 
+#[derive(Eq, PartialEq, Hash)]
 enum TeaType {
     Black,
     Green,
@@ -613,11 +614,11 @@ pub(crate) fn prepare() -> String {
         tea_type.to_string()
     };
 
-    tea = if CAFFEINATED_TYPES.contains(tea_type) && rng.gen_bool(CHANCE_OF_DECAF) {
+    let caf_tea = if CAFFEINATED_TYPES.contains(tea_type) && rng.gen_bool(CHANCE_OF_DECAF) {
         format!("decaf {}", tea)
     } else {
         tea
     };
 
-    format!("{} {} {} {}", vessel, filled_with, heat, tea)
+    format!("{} {} {} {}", vessel, filled_with, heat, caf_tea)
 }
