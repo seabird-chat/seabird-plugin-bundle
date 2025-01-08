@@ -37,6 +37,8 @@ enum VesselType {
     #[allow(dead_code)]
     Gaiwan,
     Shiboridashi,
+    Cup,
+    Glass,
 }
 
 impl VesselType {
@@ -66,6 +68,8 @@ impl VesselType {
             VesselType::Hohin => &[],
             VesselType::Gaiwan => &["porcelain", "Ruyao"],
             VesselType::Shiboridashi => &["porcelain", "red clay"],
+            VesselType::Cup => &["plastic", "sippy"],
+            VesselType::Glass => &[],
         }
     }
 }
@@ -81,6 +85,8 @@ impl fmt::Display for VesselType {
             VesselType::Hohin => f.write_str("hohin"),
             VesselType::Gaiwan => f.write_str("gaiwan"),
             VesselType::Shiboridashi => f.write_str("shiboridashi"),
+            VesselType::Cup => f.write_str("cup"),
+            VesselType::Glass => f.write_str("glass"),
         }
     }
 }
@@ -112,7 +118,10 @@ enum TeaVariant {
     #[allow(dead_code)]
     Lemongrass,
     #[allow(dead_code)]
-    Hibiscus,
+    Herbal,
+    Decaf,
+    Creamy,
+    Gooey,
 }
 
 impl fmt::Display for TeaVariant {
@@ -130,7 +139,10 @@ impl fmt::Display for TeaVariant {
             TeaVariant::Darjeel => f.write_str("Darjeeling"),
             TeaVariant::Vanilla => f.write_str("vanilla"),
             TeaVariant::Lemongrass => f.write_str("lemongrass"),
-            TeaVariant::Hibiscus => f.write_str("hibiscus"),
+            TeaVariant::Herbal => f.write_str("herbal"),
+            TeaVariant::Decaf => f.write_str("decaf"),
+            TeaVariant::Creamy => f.write_str("creamy"),
+            TeaVariant::Gooey => f.write_str("gooey"),
         }
     }
 }
@@ -150,11 +162,13 @@ enum Temperature {
     RoomTemperature,
     // Hot
     Boiling,
+    Hot,
+    RedHot,
     Scalding,
     Steaming,
     Sweltering,
     ToastyHot,
-    RedHot,
+    Sultry,
 }
 
 impl fmt::Display for Temperature {
@@ -170,11 +184,13 @@ impl fmt::Display for Temperature {
             Temperature::Warmish => f.write_str("warmish"),
             Temperature::RoomTemperature => f.write_str("room temperature"),
             Temperature::Boiling => f.write_str("boiling"),
+            Temperature::Hot => f.write_str("hot"),
             Temperature::Scalding => f.write_str("scalding"),
             Temperature::Steaming => f.write_str("steaming"),
             Temperature::Sweltering => f.write_str("sweltering"),
             Temperature::ToastyHot => f.write_str("toasty hot"),
             Temperature::RedHot => f.write_str("red-hot"),
+            Temperature::Sultry => f.write_str("sultry"),
         }
     }
 }
@@ -199,11 +215,13 @@ lazy_static::lazy_static! {
     ];
     static ref HOT: Vec<Temperature> = vec![
         Temperature::Boiling,
+        Temperature::Hot,
         Temperature::Scalding,
         Temperature::Steaming,
         Temperature::Sweltering,
         Temperature::ToastyHot,
         Temperature::RedHot,
+        Temperature::Sultry,
     ];
     static ref COLD_HOT: Vec<Temperature> = COLD.iter().chain(HOT.iter()).cloned().collect();
     static ref WARM_HOT: Vec<Temperature> = WARM.iter().chain(HOT.iter()).cloned().collect();
@@ -237,6 +255,12 @@ enum TeaType {
     DandelionLeafAndRoot,
     Lavender,
     CinnamonApple,
+    Milk,
+    Boba,
+    MapleSyrup,
+    Hibiscus,
+    Gossip,
+    Testosterone,
 }
 
 impl TeaType {
@@ -298,6 +322,36 @@ impl TeaType {
             }
             TeaType::Lavender => &[VesselType::Teapot, VesselType::Mug, VesselType::Teacup],
             TeaType::CinnamonApple => &[VesselType::Teapot, VesselType::Mug],
+            TeaType::Milk => &[VesselType::Bowl, VesselType::Cup, VesselType::Glass],
+            TeaType::Boba => &[VesselType::Bowl, VesselType::Cup, VesselType::Glass],
+            TeaType::MapleSyrup => &[
+                VesselType::Teapot,
+                VesselType::Mug,
+                VesselType::Bowl,
+                VesselType::Teacup,
+            ],
+            TeaType::Hibiscus => &[
+                VesselType::Teapot,
+                VesselType::Mug,
+                VesselType::Bowl,
+                VesselType::Teacup,
+            ],
+            TeaType::Gossip => &[
+                VesselType::Teapot,
+                VesselType::Mug,
+                VesselType::Bowl,
+                VesselType::Teacup,
+                VesselType::Cup,
+                VesselType::Glass,
+            ],
+            TeaType::Testosterone => &[
+                VesselType::Teapot,
+                VesselType::Mug,
+                VesselType::Bowl,
+                VesselType::Teacup,
+                VesselType::Cup,
+                VesselType::Glass,
+            ],
         }
     }
 
@@ -335,6 +389,42 @@ impl TeaType {
             TeaType::DandelionLeafAndRoot => &[TeaVariant::Homemade],
             TeaType::Lavender => &[TeaVariant::Homemade],
             TeaType::CinnamonApple => &[],
+            TeaType::Milk => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+                TeaVariant::Creamy,
+            ],
+            TeaType::Boba => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+                TeaVariant::Creamy,
+            ],
+            TeaType::MapleSyrup => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+                TeaVariant::Gooey,
+            ],
+            TeaType::Hibiscus => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+            ],
+            TeaType::Gossip => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+                TeaVariant::Gooey,
+            ],
+            TeaType::Testosterone => &[
+                TeaVariant::FairTrade,
+                TeaVariant::Organic,
+                TeaVariant::Homemade,
+                TeaVariant::Creamy,
+                TeaVariant::Gooey,
+            ],
         }
     }
 
@@ -366,6 +456,12 @@ impl TeaType {
             TeaType::DandelionLeafAndRoot => ALL.as_ref(),
             TeaType::Lavender => ALL.as_ref(),
             TeaType::CinnamonApple => ALL.as_ref(),
+            TeaType::Milk => COLD.as_ref(),
+            TeaType::Boba => COLD.as_ref(),
+            TeaType::MapleSyrup => ALL.as_ref(),
+            TeaType::Hibiscus => ALL.as_ref(),
+            TeaType::Gossip => ALL.as_ref(),
+            TeaType::Testosterone => ALL.as_ref(),
         }
     }
 }
@@ -399,6 +495,12 @@ impl fmt::Display for TeaType {
             TeaType::DandelionLeafAndRoot => f.write_str("dandelion leaf-and-root tea"),
             TeaType::Lavender => f.write_str("lavender tea"),
             TeaType::CinnamonApple => f.write_str("cinnamon-apple tea"),
+            TeaType::Milk => f.write_str("milk tea"),
+            TeaType::Boba => f.write_str("boba tea"),
+            TeaType::MapleSyrup => f.write_str("maple syrup tea"),
+            TeaType::Hibiscus => f.write_str("hibiscus tea"),
+            TeaType::Gossip => f.write_str("goss"),
+            TeaType::Testosterone => f.write_str("T"),
         }
     }
 }
@@ -436,10 +538,12 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::DandelionLeafAndRoot,
     TeaType::Lavender,
     TeaType::CinnamonApple,
+    TeaType::Gossip,
+    TeaType::Testosterone,
 ];
 
 const SIZES: &[&str] = &[
-    "large", "small", "medium", "tall", "wide", "big", "100ml", "giant", "tiny",
+    "large", "small", "medium", "tall", "wide", "big", "100ml", "giant", "tiny", "thicc",
 ];
 const FILLED_WITH: &[&str] = &[
     "filled with",
@@ -447,6 +551,7 @@ const FILLED_WITH: &[&str] = &[
     "stuffed with",
     "full of",
     "brimming with",
+    "overflowing with",
 ];
 
 // TODO: add function to look up a tea based on the name
