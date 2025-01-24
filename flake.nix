@@ -26,6 +26,7 @@
               })
               pkgs.rust-analyzer
               pkgs.sqlx-cli
+              pkgs.protobuf
             ];
 
             RUST_BACKTRACE = 1;

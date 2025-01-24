@@ -263,8 +263,6 @@ enum TeaType {
     Boba,
     MapleSyrup,
     Hibiscus,
-    Gossip,
-    Testosterone,
 }
 
 impl TeaType {
@@ -341,22 +339,6 @@ impl TeaType {
                 VesselType::Bowl,
                 VesselType::Teacup,
             ],
-            TeaType::Gossip => &[
-                VesselType::Teapot,
-                VesselType::Mug,
-                VesselType::Bowl,
-                VesselType::Teacup,
-                VesselType::Cup,
-                VesselType::Glass,
-            ],
-            TeaType::Testosterone => &[
-                VesselType::Teapot,
-                VesselType::Mug,
-                VesselType::Bowl,
-                VesselType::Teacup,
-                VesselType::Cup,
-                VesselType::Glass,
-            ],
         }
     }
 
@@ -418,19 +400,6 @@ impl TeaType {
                 TeaVariant::Organic,
                 TeaVariant::Homemade,
             ],
-            TeaType::Gossip => &[
-                TeaVariant::FairTrade,
-                TeaVariant::Organic,
-                TeaVariant::Homemade,
-                TeaVariant::Gooey,
-            ],
-            TeaType::Testosterone => &[
-                TeaVariant::FairTrade,
-                TeaVariant::Organic,
-                TeaVariant::Homemade,
-                TeaVariant::Creamy,
-                TeaVariant::Gooey,
-            ],
         }
     }
 
@@ -467,8 +436,6 @@ impl TeaType {
             TeaType::Boba => COLD.as_ref(),
             TeaType::MapleSyrup => ALL.as_ref(),
             TeaType::Hibiscus => ALL.as_ref(),
-            TeaType::Gossip => ALL.as_ref(),
-            TeaType::Testosterone => ALL.as_ref(),
         }
     }
 }
@@ -507,8 +474,6 @@ impl fmt::Display for TeaType {
             TeaType::Boba => f.write_str("boba tea"),
             TeaType::MapleSyrup => f.write_str("maple syrup tea"),
             TeaType::Hibiscus => f.write_str("hibiscus tea"),
-            TeaType::Gossip => f.write_str("goss"),
-            TeaType::Testosterone => f.write_str("T"),
         }
     }
 }
@@ -551,8 +516,6 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::Boba,
     TeaType::MapleSyrup,
     TeaType::Hibiscus,
-    TeaType::Gossip,
-    TeaType::Testosterone,
 ];
 
 lazy_static::lazy_static! {
