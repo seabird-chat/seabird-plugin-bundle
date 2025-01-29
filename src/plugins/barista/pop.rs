@@ -40,7 +40,7 @@ const POPS: &[&str] = &[
     "Orange Crush",
     "Orange Fanta",
     "RC Cola",
-    "Sierra Mist",
+    "Starry",
     "Sprite",
     "Squirt",
     "Sun Drop",
