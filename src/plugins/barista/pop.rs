@@ -33,7 +33,6 @@ const POPS: &[&str] = &[
     // Other
     "7 Up",
     "Dr. Pepper",
-    "Jones Cream Soda",
     "Mello Yello",
     "Mountain Dew Baja Blast",
     "Mountain Dew",
