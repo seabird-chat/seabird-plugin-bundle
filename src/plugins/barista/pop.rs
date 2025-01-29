@@ -40,9 +40,9 @@ const POPS: &[&str] = &[
     "Orange Crush",
     "Orange Fanta",
     "RC Cola",
-    "Starry",
     "Sprite",
     "Squirt",
+    "Starry",
     "Sun Drop",
     "Surge",
 ];
