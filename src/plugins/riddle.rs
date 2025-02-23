@@ -1,7 +1,10 @@
-use rand::seq::SliceRandom;
 use crate::prelude::*;
+use rand::seq::SliceRandom;
+use tokio::sync::Mutex;
 
-pub struct RiddlePlugin;
+pub struct RiddlePlugin {
+    riddle_answers: Mutex<HashMap<String, &'static str>>,
+}
 
 const RIDDLES: &[(&str, &str)] = &[
     // The Hobbit or There and Back Again by J.R.R. Tolkien - Chapter 5: Riddles in the Dark
@@ -16,39 +19,43 @@ const RIDDLES: &[(&str, &str)] = &[
     ("This thing all things devours: birds, beasts, trees, flowers; Gnaws iron, bites steel; Grinds hard stones to meal; Slays king, ruins town, and beats high mountain down", "time"),
 ];
 
-
 impl RiddlePlugin {
-
-    //TODO - Can we save the last given riddle for !answer?
-    let previous_riddle = ""
-
-    async fn handle_riddle_ask(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
-        let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
+    async fn handle_riddle_ask(&self, ctx: &Arc<Context>) -> Result<()> {
+        let target = ctx.sender().unwrap_or_else(|| "someone");
         let riddle = RIDDLES.choose(&mut rand::thread_rng()).unwrap();
         ctx.action_reply(&format!("asks {}: {}", target, riddle.0))
             .await?;
-        previous_riddle = riddle;
+
+        if let Some(channel_id) = ctx.target_channel_id() {
+            self.riddle_answers
+                .lock()
+                .await
+                .insert(String::from(channel_id), riddle.1);
+        }
+
         Ok(())
     }
 
     async fn handle_riddle_answer(&self, ctx: &Arc<Context>) -> Result<()> {
-        if previous_riddle != "" {
-            ctx.action_reply(&format!("answers: {}", previous_riddle.1))
-                .await?;
-        } else {
-            ctx.action_reply(&format!("cannot remember..."))
-                .await?;
+        if let Some(channel_id) = ctx.target_channel_id() {
+            if let Some(previous_answer) = self.riddle_answers.lock().await.remove(channel_id) {
+                ctx.action_reply(&format!("answers: {}", previous_answer))
+                    .await?;
+            } else {
+                ctx.action_reply(&format!("cannot remember...")).await?;
+            }
         }
+
         Ok(())
     }
-
 }
 
 #[async_trait]
 impl Plugin for RiddlePlugin {
-
     fn new_from_env() -> Result<Self> {
-        Ok(RiddlePlugin {})
+        Ok(RiddlePlugin {
+            riddle_answers: Default::default(),
+        })
     }
 
     fn command_metadata(&self) -> Vec<CommandMetadata> {
@@ -71,7 +78,7 @@ impl Plugin for RiddlePlugin {
 
         while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
-                Ok(Event::Command("riddle", arg)) => self.handle_riddle_ask(&ctx, arg).await,
+                Ok(Event::Command("riddle", _arg)) => self.handle_riddle_ask(&ctx).await,
                 Ok(Event::Command("answer", _arg)) => self.handle_riddle_answer(&ctx).await,
                 _ => Ok(()),
             };
@@ -81,5 +88,4 @@ impl Plugin for RiddlePlugin {
 
         Err(format_err!("riddle plugin lagged"))
     }
-
 }

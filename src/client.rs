@@ -319,6 +319,30 @@ impl Context {
         }
     }
 
+    pub fn target_channel_id(&self) -> Option<&str> {
+        match &self.raw_event {
+            SeabirdEvent::Action(message) => message.source.as_ref().map(|s| s.channel_id.as_ref()),
+            SeabirdEvent::Message(message) => {
+                message.source.as_ref().map(|s| s.channel_id.as_ref())
+            }
+            SeabirdEvent::Command(message) => {
+                message.source.as_ref().map(|s| s.channel_id.as_ref())
+            }
+            SeabirdEvent::Mention(message) => {
+                message.source.as_ref().map(|s| s.channel_id.as_ref())
+            }
+
+            SeabirdEvent::PrivateAction(_message) => None,
+            SeabirdEvent::PrivateMessage(_message) => None,
+
+            // Seabird-sent events
+            SeabirdEvent::SendMessage(message) => Some(message.channel_id.as_ref()),
+            SeabirdEvent::SendPrivateMessage(_message) => None,
+            SeabirdEvent::PerformAction(message) => Some(message.channel_id.as_ref()),
+            SeabirdEvent::PerformPrivateAction(_message) => None,
+        }
+    }
+
     pub async fn list_backends(&self) -> Result<ListBackendsResponse> {
         self.client.list_backends().await
     }
