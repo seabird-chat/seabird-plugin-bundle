@@ -52,6 +52,7 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "minecraft",
         "net_tools",
         "noaa",
+        "riddle",
         "introspection",
         "help",
     ];
@@ -133,6 +134,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
 
     if config.plugin_enabled("noaa") {
         ret.push(start_plugin::<plugins::NoaaPlugin>(&bot)?);
+    }
+
+    if config.plugin_enabled("riddle") {
+        ret.push(start_plugin::<plugins::RiddlePlugin>(&bot)?);
     }
 
     if config.plugin_enabled("introspection") {
