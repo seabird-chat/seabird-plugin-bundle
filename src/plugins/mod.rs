@@ -22,6 +22,9 @@ pub use self::net_tools::NetToolsPlugin;
 mod noaa;
 pub use self::noaa::NoaaPlugin;
 
+mod riddle;
+pub use self::riddle::RiddlePlugin;
+
 mod introspection;
 pub use self::introspection::IntrospectionPlugin;
 
