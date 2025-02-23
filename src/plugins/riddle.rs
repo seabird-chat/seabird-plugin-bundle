@@ -1,5 +1,4 @@
 use rand::seq::SliceRandom;
-use std::{thread, time};
 use crate::prelude::*;
 
 pub struct RiddlePlugin;
@@ -17,16 +16,29 @@ const RIDDLES: &[(&str, &str)] = &[
     ("This thing all things devours: birds, beasts, trees, flowers; Gnaws iron, bites steel; Grinds hard stones to meal; Slays king, ruins town, and beats high mountain down", "time"),
 ];
 
+
 impl RiddlePlugin {
 
-    async fn handle_riddle(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
+    //TODO - Can we save the last given riddle for !answer?
+    let previous_riddle = ""
+
+    async fn handle_riddle_ask(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
         let target = arg.or_else(|| ctx.sender()).unwrap_or("someone");
         let riddle = RIDDLES.choose(&mut rand::thread_rng()).unwrap();
-        ctx.action_reply(&format!("tells {}: {}", target, riddle.0))
+        ctx.action_reply(&format!("asks {}: {}", target, riddle.0))
             .await?;
-        thread::sleep(time::Duration::from_secs(5));
-        ctx.action_reply(&format!("answers: {}", riddle.1))
-            .await?;
+        previous_riddle = riddle;
+        Ok(())
+    }
+
+    async fn handle_riddle_answer(&self, ctx: &Arc<Context>) -> Result<()> {
+        if previous_riddle != "" {
+            ctx.action_reply(&format!("answers: {}", previous_riddle.1))
+                .await?;
+        } else {
+            ctx.action_reply(&format!("cannot remember..."))
+                .await?;
+        }
         Ok(())
     }
 
@@ -46,6 +58,11 @@ impl Plugin for RiddlePlugin {
                 short_help: "usage: riddle. Get a riddle from the bot.".to_string(),
                 full_help: "gives a random riddle".to_string(),
             },
+            CommandMetadata {
+                name: "answer".to_string(),
+                short_help: "usage: answer. Get the answer to the riddle.".to_string(),
+                full_help: "gives the answer to the last given riddle".to_string(),
+            },
         ]
     }
 
@@ -54,7 +71,8 @@ impl Plugin for RiddlePlugin {
 
         while let Ok(ctx) = stream.recv().await {
             let res = match ctx.as_event() {
-                Ok(Event::Command("riddle", arg)) => self.handle_riddle(&ctx, arg).await,
+                Ok(Event::Command("riddle", arg)) => self.handle_riddle_ask(&ctx, arg).await,
+                Ok(Event::Command("answer", _arg)) => self.handle_riddle_answer(&ctx).await,
                 _ => Ok(()),
             };
 
