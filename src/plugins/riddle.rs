@@ -54,11 +54,39 @@ const RIDDLES: &[(&str, &str)] = &[
     ("What can be swallowed but can also swallow you?", "water"),
     ("What is it that you keep when you need it not, but throw out when you do need it?", "an anchor"),
     ("In the form of fork or sheet, I hit the ground. And if you wait a heartbeat, you can hear my roaring sound.", "lightning"),
-];
+    // ChatGPT Generated
+    ("I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?", "an echo"),
+    ("What has keys but can’t open locks?", "a piano"),
+    ("The more you take, the more you leave behind. What am I?", "footsteps"),
+    ("What has a head, a tail, but no body?", "a coin"),
+    ("I have cities, but no houses. I have forests, but no trees. I have rivers, but no water. What am I?", "a map"),
+    ("What comes once in a minute, twice in a moment, but never in a thousand years?", "the letter 'm'"),
+    ("What can travel around the world while staying in the corner?", "a stamp"),
+    ("What has one eye but can’t see?", "a needle"),
+    ("What is so fragile that saying its name breaks it?", "silence"),
+    ("What gets wetter the more it dries?", "a towel"),
+    ("What runs but never walks?", "water"),
+    ("What can you catch but never throw?", "a cold"),
+    ("What is always in front of you but can’t be seen?", "the future"),
+    ("What can be cracked, made, told, and played?", "a joke"),
+    ("What has four fingers and a thumb but isn’t alive?", "a glove"),
+    ("What is black and white and red all over?", "a newspaper"),
+    ("What can’t be used until it’s broken?", "an egg"),
+    ("The more you have of it, the less you see. What is it?", "darkness"),
+    ("What has a bottom at the top?", "a leg"),
+    ("What can be heard but not seen?", "a sound"),
+    ("I have no eyes, but I can cry. What am I?", "a cloud"),
+    ("What is always coming but never arrives?", "tomorrow"),
+    ("What has a thumb and four fingers but isn’t alive?", "a glove"),
+    ("I am not alive, but I grow; I do not have lungs, but I need air; I do not have a mouth, but water kills me. What am I?", "fire"),
+    ("What begins with an e, ends with an e, but only has one letter?", "an envelope"),
+    ("What runs but never walks, has a bed but never sleeps?", "a river"),
+    ("What gets sharper the more you use me?", "your brain"),
+    ];
 
-impl RiddlePlugin {
-    async fn handle_riddle_ask(&self, ctx: &Arc<Context>) -> Result<()> {
-        let target = ctx.sender().unwrap_or_else(|| "someone");
+    impl RiddlePlugin {
+        async fn handle_riddle_ask(&self, ctx: &Arc<Context>) -> Result<()> {
+            let target = ctx.sender().unwrap_or_else(|| "someone");
         let riddle = RIDDLES.choose(&mut rand::thread_rng()).unwrap();
         ctx.action_reply(&format!("asks {}: {}", target, riddle.0))
             .await?;
