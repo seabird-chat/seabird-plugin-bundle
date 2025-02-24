@@ -37,7 +37,7 @@ const RIDDLES: &[(&str, &str)] = &[
     ("Tall I am young, short I am old. While with life I do glow, and wind is my foe.", "a candle"),
     ("What flies forever but never rests?", "the wind"),
     ("Capable of Kindness and cruelty, I take victims when I sour. I can be on your side or wrong you. I bring gifts though you already have me.", "fate"),
-    ("The beginning of eternity, the end of time and space; the beginning of every end, the end if every place. What am I?", "the letter E"),
+    ("The beginning of eternity, the end of time and space; the beginning of every end, the end of every place. What am I?", "the letter E"),
     ("Lose me once I'll come back stronger, lose me twice I'll leave forever, what am I?", "a tooth"),
     ("We sound like Eden as a pair. Make us weight, we won't play fair. Sometimes consensus, most times schism. Usually locked away in prism. If by chance you seek, then throw. The serpent sees where we meet low. We carry freight when we meet high, But separate us, and we die.", "a pair of dice"),
     ("As a stone inside a tree, I'll help your words outlive thee. But if you push me as I stand, the more I move the less I am.", "a pencil"),
