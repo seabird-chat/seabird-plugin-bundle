@@ -16,10 +16,6 @@
         in
         {
           devShells.default = pkgs.mkShell {
-            buildInputs = [
-              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-            ];
-
             nativeBuildInputs = [
               (pkgs.rust-bin.stable."1.81.0".default.override {
                 extensions = ["rust-src"];

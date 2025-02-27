@@ -38,7 +38,6 @@ enum VesselType {
     Samovar,
     Teacup,
     Hohin,
-    #[allow(dead_code)]
     Gaiwan,
     Shiboridashi,
     Cup,
@@ -263,6 +262,7 @@ enum TeaType {
     Boba,
     MapleSyrup,
     Hibiscus,
+    Genmaicha,
 }
 
 impl TeaType {
@@ -339,6 +339,7 @@ impl TeaType {
                 VesselType::Bowl,
                 VesselType::Teacup,
             ],
+            TeaType::Genmaicha => &[VesselType::Teapot, VesselType::Mug, VesselType::Gaiwan],
         }
     }
 
@@ -400,6 +401,7 @@ impl TeaType {
                 TeaVariant::Organic,
                 TeaVariant::Homemade,
             ],
+            TeaType::Genmaicha => &[],
         }
     }
 
@@ -436,6 +438,7 @@ impl TeaType {
             TeaType::Boba => COLD.as_ref(),
             TeaType::MapleSyrup => ALL.as_ref(),
             TeaType::Hibiscus => ALL.as_ref(),
+            TeaType::Genmaicha => HOT.as_ref(),
         }
     }
 }
@@ -474,6 +477,7 @@ impl fmt::Display for TeaType {
             TeaType::Boba => f.write_str("boba tea"),
             TeaType::MapleSyrup => f.write_str("maple syrup tea"),
             TeaType::Hibiscus => f.write_str("hibiscus tea"),
+            TeaType::Genmaicha => f.write_str("genmaicha"),
         }
     }
 }
@@ -516,6 +520,7 @@ const TEA_TYPES: &[TeaType] = &[
     TeaType::Boba,
     TeaType::MapleSyrup,
     TeaType::Hibiscus,
+    TeaType::Genmaicha,
 ];
 
 lazy_static::lazy_static! {
