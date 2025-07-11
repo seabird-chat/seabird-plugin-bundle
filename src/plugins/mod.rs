@@ -25,6 +25,9 @@ pub use self::noaa::NoaaPlugin;
 mod riddle;
 pub use self::riddle::RiddlePlugin;
 
+mod scryfall;
+pub use self::scryfall::ScryfallPlugin;
+
 mod introspection;
 pub use self::introspection::IntrospectionPlugin;
 
