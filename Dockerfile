@@ -24,8 +24,11 @@ COPY . .
 RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird-* /usr/local/bin
 
 # Create a new base and copy in only what we need.
-FROM debian:bookworm
+FROM debian:bookworm-slim
 ENV RUST_LOG=info
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/app
 RUN mkdir migrations
 
