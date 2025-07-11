@@ -19,7 +19,16 @@ impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
         let card = Card::named_fuzzy(arg).await?;
 
-        ctx.mention_reply(card.scryfall_uri.as_str()).await?;
+        let card_uri = card.scryfall_uri;
+        let image_uri = card.image_uris.and_then(|uris| uris.png);
+
+        match image_uri {
+            Some(image_uri) => {
+                ctx.mention_reply(&format!("{} ({})", card_uri, image_uri.as_str()))
+                    .await?
+            }
+            None => ctx.mention_reply(&format!("{}", card_uri)).await?,
+        }
 
         Ok(())
     }
@@ -35,7 +44,6 @@ impl ScryfallPlugin {
 
         // Loop through all captures, adding them to the output.
         for capture in captures {
-            println!("{:?}", capture);
             match self.handle_scryfall(ctx, &capture[1]).await {
                 Ok(_) => {}
                 Err(e) => {
