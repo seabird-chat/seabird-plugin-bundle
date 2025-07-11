@@ -24,7 +24,7 @@ COPY . .
 RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird-* /usr/local/bin
 
 # Create a new base and copy in only what we need.
-FROM debian:bullseye-slim
+FROM debian:bullseye
 ENV RUST_LOG=info
 WORKDIR /usr/src/app
 RUN mkdir migrations
