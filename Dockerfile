@@ -1,4 +1,4 @@
-FROM rust:1.88-bullseye AS builder
+FROM rust:1.88-bookworm AS builder
 WORKDIR /usr/src/app
 
 # Workaround to allow arm64 builds to work properly
@@ -24,7 +24,7 @@ COPY . .
 RUN touch src/main.rs && cargo build --release && cp -v target/release/seabird-* /usr/local/bin
 
 # Create a new base and copy in only what we need.
-FROM debian:bullseye
+FROM debian:bookworm
 ENV RUST_LOG=info
 WORKDIR /usr/src/app
 RUN mkdir migrations
