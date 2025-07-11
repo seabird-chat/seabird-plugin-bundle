@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::fmt::Write;
+
 use regex::Regex;
 use scryfall::{search::Search, Card};
 use url::Url;
@@ -18,9 +21,47 @@ impl ScryfallPlugin {
     }
 }
 
+fn reqwest_error_string(err: &reqwest::Error) -> String {
+    let mut err: &dyn std::error::Error = &err;
+    let mut s = format!("{}", err);
+    while let Some(src) = err.source() {
+        let _ = write!(s, "\n\nCaused by: {}", src);
+        err = src;
+    }
+    s
+}
+
+fn scryfall_api_error_string(err: &scryfall::error::ScryfallError) -> String {
+    format!("Error code: {}, Details: {}", err.code, err.details)
+}
+
+// Unfortunately, some of the errors Scryfall provides aren't very helpful, so
+// we provide an alternative to scryfall's fmt::Display implementation.
+fn scryfall_error_string(err: &scryfall::Error) -> String {
+    match err {
+        scryfall::Error::JsonError(inner_err) => format!("JSON error: {}", inner_err),
+        scryfall::Error::UrlEncodedError(inner_err) => format!("URL encoding error: {}", inner_err),
+        scryfall::Error::UrlParseError(inner_err) => format!("URL parse error: {}", inner_err),
+        scryfall::Error::ReqwestError {
+            error: inner_err,
+            url: _,
+        } => format!("Request error: {}", reqwest_error_string(inner_err)),
+        scryfall::Error::ScryfallError(inner_err) => format!(
+            "Scryfall API error: {}",
+            scryfall_api_error_string(inner_err)
+        ),
+        scryfall::Error::HttpError(inner_err) => format!("HTTP error: {}", inner_err),
+        scryfall::Error::IoError(inner_err) => format!("IO error: {}", inner_err),
+        scryfall::Error::Other(inner_err) => format!("Other error: {}", inner_err),
+    }
+}
+
 impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
-        let card_iter = Card::search(arg).await?;
+        let card_iter = Card::search(arg).await.map_err(|err| {
+            println!("{}", scryfall_error_string(&err));
+            err
+        })?;
 
         let (n, _) = card_iter.size_hint();
         if n > 1 {
