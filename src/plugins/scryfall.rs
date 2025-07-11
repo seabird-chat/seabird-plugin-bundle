@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use regex::Regex;
 use scryfall::Card;
 
@@ -17,7 +19,17 @@ impl ScryfallPlugin {
 
 impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
-        let card = Card::named_fuzzy(arg).await?;
+        let card = Card::named_fuzzy(arg).await.map_err(|err| {
+            let mut s = format!("{}", err);
+
+            let inner: &dyn std::error::Error = &err;
+            while let Some(inner) = inner.source() {
+                let _ = write!(s, "\n\nCaused by: {}", inner);
+            }
+            println!("ERR: {}", s);
+
+            err
+        })?;
 
         let card_uri = card.scryfall_uri;
         let image_uri = card.image_uris.and_then(|uris| uris.png);
