@@ -19,23 +19,7 @@ impl ScryfallPlugin {
 
 impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
-        let card = Card::named_fuzzy(arg).await.map_err(|err| {
-            match &err {
-                scryfall::Error::ReqwestError { error, url: _ } => {
-                    let mut s = format!("{}", error);
-
-                    let mut inner: &dyn std::error::Error = &error;
-                    while let Some(src) = inner.source() {
-                        let _ = write!(s, "\n\nCaused by: {}", inner);
-                        inner = src;
-                    }
-                    println!("REQWEST ERR: {}", s);
-                }
-                _ => {}
-            }
-
-            err
-        })?;
+        let card = Card::named_fuzzy(arg).await?;
 
         let card_uri = card.scryfall_uri;
         let image_uri = card.image_uris.and_then(|uris| uris.png);
