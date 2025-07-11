@@ -1,13 +1,17 @@
+use std::error::Error;
 use std::fmt::Write;
 
 use regex::Regex;
-use scryfall::Card;
+use scryfall::{search::Search, Card};
+use url::Url;
 
 use crate::prelude::*;
 
 pub struct ScryfallPlugin {
     re: Regex,
 }
+
+const SCRYFALL_SEARCH_URL: &str = "https://scryfall.com/search";
 
 impl ScryfallPlugin {
     pub fn new() -> Self {
@@ -17,19 +21,62 @@ impl ScryfallPlugin {
     }
 }
 
+fn reqwest_error_string(err: &reqwest::Error) -> String {
+    let mut err: &dyn std::error::Error = &err;
+    let mut s = format!("{}", err);
+    while let Some(src) = err.source() {
+        let _ = write!(s, "\n\nCaused by: {}", src);
+        err = src;
+    }
+    s
+}
+
+fn scryfall_api_error_string(err: &scryfall::error::ScryfallError) -> String {
+    format!("Error code: {}, Details: {}", err.code, err.details)
+}
+
+// Unfortunately, some of the errors Scryfall provides aren't very helpful, so
+// we provide an alternative to scryfall's fmt::Display implementation.
+fn scryfall_error_string(err: &scryfall::Error) -> String {
+    match err {
+        scryfall::Error::JsonError(inner_err) => format!("JSON error: {}", inner_err),
+        scryfall::Error::UrlEncodedError(inner_err) => format!("URL encoding error: {}", inner_err),
+        scryfall::Error::UrlParseError(inner_err) => format!("URL parse error: {}", inner_err),
+        scryfall::Error::ReqwestError {
+            error: inner_err,
+            url: _,
+        } => format!("Request error: {}", reqwest_error_string(inner_err)),
+        scryfall::Error::ScryfallError(inner_err) => format!(
+            "Scryfall API error: {}",
+            scryfall_api_error_string(inner_err)
+        ),
+        scryfall::Error::HttpError(inner_err) => format!("HTTP error: {}", inner_err),
+        scryfall::Error::IoError(inner_err) => format!("IO error: {}", inner_err),
+        scryfall::Error::Other(inner_err) => format!("Other error: {}", inner_err),
+    }
+}
+
 impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
-        let card = Card::named_fuzzy(arg).await?;
+        let card_iter = Card::search(arg).await.map_err(|err| {
+            println!("{}", scryfall_error_string(&err));
+            err
+        })?;
 
-        let card_uri = card.scryfall_uri;
-        let image_uri = card.image_uris.and_then(|uris| uris.png);
+        let (n, _) = card_iter.size_hint();
+        if n > 1 {
+            let mut search_url = Url::parse(SCRYFALL_SEARCH_URL)?;
+            arg.write_query(&mut search_url)?;
 
-        match image_uri {
-            Some(image_uri) => {
-                ctx.mention_reply(&format!("{} ({})", card_uri, image_uri.as_str()))
-                    .await?
-            }
-            None => ctx.mention_reply(&format!("{}", card_uri)).await?,
+            ctx.mention_reply(&format!("Found {} results: {}", n, search_url))
+                .await?;
+        }
+
+        let mut card_stream = card_iter.into_stream().take(3);
+
+        while let Some(card) = card_stream.try_next().await? {
+            ctx.mention_reply(&format!("{}: {}", card.name, card.scryfall_uri))
+                .await?;
         }
 
         Ok(())
@@ -46,8 +93,20 @@ impl ScryfallPlugin {
 
         // Loop through all captures, adding them to the output.
         for capture in captures {
-            match self.handle_scryfall(ctx, &capture[1]).await {
-                Ok(_) => {}
+            match Card::named(&capture[1]).await {
+                Ok(card) => {
+                    let card_uri = card.scryfall_uri;
+                    let image_uri = card.image_uris.and_then(|uris| uris.png);
+                    match image_uri {
+                        Some(image_uri) => {
+                            ctx.mention_reply(&format!("{} ({})", card_uri, image_uri.as_str()))
+                                .await?;
+                        }
+                        None => {
+                            ctx.mention_reply(&format!("{}", card_uri)).await?;
+                        }
+                    }
+                }
                 Err(e) => {
                     change_errors.push(format!("failed to look up \"{}\": {}", &capture[1], e));
                 }
