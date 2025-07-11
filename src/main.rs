@@ -17,7 +17,7 @@ pub use seabird::proto;
 
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
-        error!("unexpected error: {}", err);
+        error!("unexpected error: {:?}", err);
 
         let inner = ctx
             .mention_reply(&format!("unexpected error: {}", err))
