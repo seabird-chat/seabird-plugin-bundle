@@ -20,13 +20,19 @@ impl ScryfallPlugin {
 impl ScryfallPlugin {
     async fn handle_scryfall(&self, ctx: &Arc<Context>, arg: &str) -> Result<()> {
         let card = Card::named_fuzzy(arg).await.map_err(|err| {
-            let mut s = format!("{}", err);
+            match &err {
+                scryfall::Error::ReqwestError { error, url: _ } => {
+                    let mut s = format!("{}", error);
 
-            let inner: &dyn std::error::Error = &err;
-            while let Some(inner) = inner.source() {
-                let _ = write!(s, "\n\nCaused by: {}", inner);
+                    let mut inner: &dyn std::error::Error = &error;
+                    while let Some(src) = inner.source() {
+                        let _ = write!(s, "\n\nCaused by: {}", inner);
+                        inner = src;
+                    }
+                    println!("REQWEST ERR: {}", s);
+                }
+                _ => {}
             }
-            println!("ERR: {}", s);
 
             err
         })?;
@@ -81,9 +87,9 @@ impl Plugin for ScryfallPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "scryfall".to_string(),
-            short_help: "usage: scryfall [card name]. gives a link to a card on Scryfall."
+            short_help: "usage: scryfall [card name]. gives a link to a magic card on Scryfall."
                 .to_string(),
-            full_help: "gives a link to a given card on Scryfall if it exists".to_string(),
+            full_help: "gives a link to a given magic card on Scryfall if it exists".to_string(),
         }]
     }
 
