@@ -1,6 +1,7 @@
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
 use anyhow::Context;
+use std::fmt::Write;
 
 #[macro_use]
 extern crate log;
@@ -15,15 +16,24 @@ pub(crate) mod utils;
 
 pub use seabird::proto;
 
+fn report(err: &anyhow::Error) -> String {
+    let mut s = format!("{}", err);
+    for cause in err.chain() {
+        let _ = write!(s, "\n\nCaused by: {}", cause);
+    }
+
+    s
+}
+
 async fn check_err<T>(ctx: &client::Context, res: error::Result<T>) {
     if let Err(err) = res {
-        error!("unexpected error: {:?}", err);
+        error!("unexpected error: {}", report(&err));
 
         let inner = ctx
             .mention_reply(&format!("unexpected error: {}", err))
             .await;
         if let Err(inner) = inner {
-            error!("unexpected error ({}) while handling: {}", inner, err);
+            error!("unexpected error ({}) while handling error: {}", inner, err);
         }
     }
 }
