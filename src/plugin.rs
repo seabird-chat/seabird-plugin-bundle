@@ -47,8 +47,6 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "barista",
         "chance",
         "forecast",
-        "help",
-        "introspection",
         "karma",
         "mention",
         "minecraft",

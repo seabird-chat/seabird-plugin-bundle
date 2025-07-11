@@ -71,7 +71,7 @@ impl Plugin for ScryfallPlugin {
             name: "scryfall".to_string(),
             short_help: "usage: scryfall [card name]. gives a link to a card on Scryfall."
                 .to_string(),
-            full_help: "gives a link to a fiven card on Scryfall if it exists".to_string(),
+            full_help: "gives a link to a given card on Scryfall if it exists".to_string(),
         }]
     }
 
