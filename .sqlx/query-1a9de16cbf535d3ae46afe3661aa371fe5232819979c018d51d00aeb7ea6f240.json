@@ -1,15 +1,10 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "INSERT INTO forecast_location (nick, address, lat, lng) VALUES ($1, $2, $3, $4)\nON CONFLICT (nick) DO\nUPDATE SET address=EXCLUDED.address, lat=EXCLUDED.lat, lng=EXCLUDED.lng;",
   "describe": {
     "columns": [],
     "parameters": {
-      "Left": [
-        "Text",
-        "Text",
-        "Float8",
-        "Float8"
-      ]
+      "Right": 4
     },
     "nullable": []
   },

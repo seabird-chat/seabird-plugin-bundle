@@ -23,10 +23,12 @@
               pkgs.rust-analyzer
               pkgs.sqlx-cli
               pkgs.protobuf
+              pkgs.sqlite
             ];
 
             RUST_BACKTRACE = 1;
-            DATABASE_URL = "postgres:///seabird";
+            #DATABASE_URL = "postgres:///seabird";
+            DATABASE_URL = "sqlite://seabird.db";
           };
         }
       );

@@ -8,11 +8,11 @@ use crate::prelude::*;
 #[derive(sqlx::FromRow, Debug)]
 pub struct Karma {
     pub name: String,
-    pub score: i32,
+    pub score: i64,
 }
 
 impl Karma {
-    async fn sanitize_name(conn: &sqlx::PgPool, name: &str) -> Result<String> {
+    async fn sanitize_name(conn: &sqlx::SqlitePool, name: &str) -> Result<String> {
         let name = name.to_lowercase();
 
         Ok(
@@ -24,7 +24,7 @@ impl Karma {
         )
     }
 
-    async fn get_by_name(conn: &sqlx::PgPool, name: &str) -> Result<Self> {
+    async fn get_by_name(conn: &sqlx::SqlitePool, name: &str) -> Result<Self> {
         Ok(
             sqlx::query_as!(Karma, "SELECT name, score FROM karma WHERE name=$1;", name)
                 .fetch_optional(conn)
@@ -36,7 +36,7 @@ impl Karma {
         )
     }
 
-    async fn create_or_update(conn: &sqlx::PgPool, name: &str, score: i32) -> Result<Self> {
+    async fn create_or_update(conn: &sqlx::SqlitePool, name: &str, score: i32) -> Result<Self> {
         sqlx::query!(
             "INSERT INTO karma (name, score) VALUES ($1, $2)
 ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",

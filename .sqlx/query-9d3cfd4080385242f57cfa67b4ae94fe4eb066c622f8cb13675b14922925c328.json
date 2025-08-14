@@ -1,13 +1,10 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)\nON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
   "describe": {
     "columns": [],
     "parameters": {
-      "Left": [
-        "Text",
-        "Text"
-      ]
+      "Right": 2
     },
     "nullable": []
   },

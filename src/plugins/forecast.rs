@@ -212,7 +212,7 @@ impl ForecastLocation {
         }
     }
 
-    async fn get_by_name(conn: &sqlx::PgPool, nick: &str) -> Result<Option<Self>> {
+    async fn get_by_name(conn: &sqlx::SqlitePool, nick: &str) -> Result<Option<Self>> {
         Ok(sqlx::query_as!(
             ForecastLocation,
             "SELECT nick, address, lat, lng FROM forecast_location WHERE nick=$1;",
@@ -223,7 +223,7 @@ impl ForecastLocation {
     }
 
     async fn set_for_name(
-        conn: &sqlx::PgPool,
+        conn: &sqlx::SqlitePool,
         nick: &str,
         address: &str,
         lat: f64,

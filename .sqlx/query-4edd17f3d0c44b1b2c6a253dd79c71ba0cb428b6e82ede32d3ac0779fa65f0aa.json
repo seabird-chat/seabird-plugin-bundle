@@ -1,23 +1,21 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT nick, station FROM noaa_location WHERE nick=$1;",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "nick",
+        "ordinal": 0,
         "type_info": "Text"
       },
       {
-        "ordinal": 1,
         "name": "station",
+        "ordinal": 1,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Right": 1
     },
     "nullable": [
       false,

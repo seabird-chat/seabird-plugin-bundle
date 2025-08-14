@@ -1,23 +1,21 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "SELECT name, score FROM karma WHERE name=$1;",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "name",
+        "ordinal": 0,
         "type_info": "Text"
       },
       {
-        "ordinal": 1,
         "name": "score",
-        "type_info": "Int4"
+        "ordinal": 1,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Right": 1
     },
     "nullable": [
       false,

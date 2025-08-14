@@ -1,13 +1,10 @@
 {
-  "db_name": "PostgreSQL",
+  "db_name": "SQLite",
   "query": "INSERT INTO karma (name, score) VALUES ($1, $2)\nON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
   "describe": {
     "columns": [],
     "parameters": {
-      "Left": [
-        "Text",
-        "Int4"
-      ]
+      "Right": 2
     },
     "nullable": []
   },

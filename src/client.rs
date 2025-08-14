@@ -63,7 +63,7 @@ impl ClientConfig {
 pub struct Client {
     config: ClientConfig,
     inner: Mutex<seabird::Client>,
-    db_pool: sqlx::PgPool,
+    db_pool: sqlx::SqlitePool,
     broadcast: broadcast::Sender<Arc<Context>>,
 }
 
@@ -175,7 +175,7 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
-        let db_pool = sqlx::postgres::PgPoolOptions::new()
+        let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
             .max_connections(config.db_pool_size)
             .connect(&config.db_url)
             .await?;
@@ -534,7 +534,7 @@ impl Context {
         }
     }
 
-    pub fn get_db(&self) -> sqlx::PgPool {
+    pub fn get_db(&self) -> sqlx::SqlitePool {
         self.client.db_pool.clone()
     }
 }

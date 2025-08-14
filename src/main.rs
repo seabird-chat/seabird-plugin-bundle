@@ -56,7 +56,7 @@ async fn main() -> error::Result<()> {
         dotenvy::var("SEABIRD_TOKEN")
             .context("Missing $SEABIRD_TOKEN. You must specify a valid auth token.")?,
         dotenvy::var("DATABASE_URL")
-            .context("Missing $DATABASE_URL. You must specify a Postgresql URL.")?,
+            .context("Missing $DATABASE_URL. You must specify a sqlite URL.")?,
         dotenvy::var("DATABASE_POOL_SIZE")
             .unwrap_or_else(|_| "5".to_string())
             .parse()

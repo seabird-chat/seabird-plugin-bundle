@@ -69,7 +69,7 @@ pub struct NoaaLocation {
 }
 
 impl NoaaLocation {
-    async fn get_by_name(conn: &sqlx::PgPool, nick: &str) -> Result<Option<Self>> {
+    async fn get_by_name(conn: &sqlx::SqlitePool, nick: &str) -> Result<Option<Self>> {
         Ok(sqlx::query_as!(
             NoaaLocation,
             "SELECT nick, station FROM noaa_location WHERE nick=$1;",
@@ -79,7 +79,7 @@ impl NoaaLocation {
         .await?)
     }
 
-    async fn set_for_name(conn: &sqlx::PgPool, nick: &str, station: &str) -> Result<()> {
+    async fn set_for_name(conn: &sqlx::SqlitePool, nick: &str, station: &str) -> Result<()> {
         sqlx::query!(
             "INSERT INTO noaa_location (nick, station) VALUES ($1, $2)
 ON CONFLICT (nick) DO UPDATE SET station=EXCLUDED.station;",
