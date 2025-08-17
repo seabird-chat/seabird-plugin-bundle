@@ -4,10 +4,7 @@ use std::fmt::Write;
 use crate::prelude::*;
 use crate::utils::HexSlice;
 
-use hickory_resolver::{
-    proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData,
-    AsyncResolver,
-};
+use hickory_resolver::{proto::rr::rdata::caa::Value as CAAValue, proto::rr::RData, AsyncResolver};
 
 pub struct NetToolsPlugin;
 
@@ -45,10 +42,7 @@ fn display_rdata(rdata: RData) -> String {
         RData::HTTPS(_https) => unimplemented!(),
         RData::MX(mx) => format!("MX {} {}", mx.preference(), mx.exchange()),
         RData::NAPTR(_naptr) => unimplemented!(),
-        RData::NULL(null) => format!(
-            "NULL {}",
-            String::from_utf8_lossy(null.anything()),
-        ),
+        RData::NULL(null) => format!("NULL {}", String::from_utf8_lossy(null.anything()),),
         RData::NS(name) => format!("NS {}", name),
         RData::OPENPGPKEY(_key) => unimplemented!(),
         RData::OPT(_opt) => unimplemented!(),
@@ -113,10 +107,7 @@ impl NetToolsPlugin {
             // If a record_type was provided, we need to try and
             // convert it.
             (Some(record_type), Some(name)) => resolver
-                .lookup(
-                    name,
-                    record_type.to_uppercase().parse()?,
-                )
+                .lookup(name, record_type.to_uppercase().parse()?)
                 .await?
                 .into_iter()
                 .map(display_rdata)

@@ -84,9 +84,9 @@ const RIDDLES: &[(&str, &str)] = &[
     ("What gets sharper the more you use me?", "your brain"),
     ];
 
-    impl RiddlePlugin {
-        async fn handle_riddle_ask(&self, ctx: &Arc<Context>) -> Result<()> {
-            let target = ctx.sender().unwrap_or_else(|| "someone");
+impl RiddlePlugin {
+    async fn handle_riddle_ask(&self, ctx: &Arc<Context>) -> Result<()> {
+        let target = ctx.sender().unwrap_or_else(|| "someone");
         let riddle = RIDDLES.choose(&mut rand::thread_rng()).unwrap();
         ctx.action_reply(&format!("asks {}: {}", target, riddle.0))
             .await?;
