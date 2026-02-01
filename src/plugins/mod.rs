@@ -33,3 +33,6 @@ pub use self::introspection::IntrospectionPlugin;
 
 mod help;
 pub use self::help::HelpPlugin;
+
+mod remind;
+pub use self::remind::RemindPlugin;
