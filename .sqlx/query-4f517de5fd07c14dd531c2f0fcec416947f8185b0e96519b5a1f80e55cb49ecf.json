@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!\", channel_id, target_user, message, remind_at, created_at, created_by\n               FROM reminders\n               WHERE created_by = $1 OR target_user = $1\n               ORDER BY remind_at ASC\n               LIMIT 10",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "channel_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_user",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "message",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "remind_at",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_by",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4f517de5fd07c14dd531c2f0fcec416947f8185b0e96519b5a1f80e55cb49ecf"
+}

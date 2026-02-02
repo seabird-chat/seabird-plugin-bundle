@@ -39,3 +39,6 @@ pub use self::quotes::QuotesPlugin;
 
 mod help;
 pub use self::help::HelpPlugin;
+
+mod remind;
+pub use self::remind::RemindPlugin;

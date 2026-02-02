@@ -54,6 +54,7 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "net_tools",
         "noaa",
         "quotes",
+        "remind",
         "riddle",
         "scryfall",
         "introspection",
@@ -161,6 +162,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
 
     if config.plugin_enabled("help") {
         ret.push(start_plugin::<plugins::HelpPlugin>(&bot)?);
+    }
+
+    if config.plugin_enabled("remind") {
+        ret.push(start_plugin::<plugins::RemindPlugin>(&bot)?);
     }
 
     Ok(ret)
