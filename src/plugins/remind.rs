@@ -12,6 +12,8 @@ struct Reminder {
     channel_id: String,
     target_user: String,
     message: String,
+    remind_at: i64,
+    created_at: i64,
     created_by: String,
 }
 
@@ -63,16 +65,101 @@ fn format_duration(secs: i64) -> String {
 }
 
 impl RemindPlugin {
+    async fn handle_list(&self, ctx: &Arc<Context>) -> Result<()> {
+        let sender = ctx
+            .sender()
+            .ok_or_else(|| format_err!("Could not determine sender"))?;
+
+        let reminders: Vec<Reminder> = sqlx::query_as!(
+            Reminder,
+            r#"SELECT id as "id!", channel_id, target_user, message, remind_at, created_at, created_by
+               FROM reminders
+               WHERE created_by = $1 OR target_user = $1
+               ORDER BY remind_at ASC
+               LIMIT 10"#,
+            sender
+        )
+        .fetch_all(&self.db_pool)
+        .await?;
+
+        if reminders.is_empty() {
+            ctx.mention_reply("You have no pending reminders.").await?;
+            return Ok(());
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() as i64;
+
+        let lines: Vec<String> = reminders
+            .iter()
+            .map(|r| {
+                let time_left = format_duration(r.remind_at - now);
+                let target = if r.target_user == sender {
+                    "you".to_string()
+                } else {
+                    r.target_user.clone()
+                };
+                format!("[{}] in {} for {}: \"{}\"", r.id, time_left, target, r.message)
+            })
+            .collect();
+
+        ctx.mention_reply(&lines.join(" | ")).await?;
+        Ok(())
+    }
+
+    async fn handle_cancel(&self, ctx: &Arc<Context>, id_str: &str) -> Result<()> {
+        let sender = ctx
+            .sender()
+            .ok_or_else(|| format_err!("Could not determine sender"))?;
+
+        let id: i64 = match id_str.trim().parse() {
+            Ok(id) => id,
+            Err(_) => {
+                ctx.mention_reply("Invalid reminder ID. Use 'remind list' to see your reminders.").await?;
+                return Ok(());
+            }
+        };
+
+        let result = sqlx::query!(
+            "DELETE FROM reminders WHERE id = $1 AND (created_by = $2 OR target_user = $2)",
+            id,
+            sender
+        )
+        .execute(&self.db_pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            ctx.mention_reply("Reminder not found or you don't have permission to cancel it.").await?;
+        } else {
+            ctx.mention_reply("Reminder cancelled.").await?;
+        }
+
+        Ok(())
+    }
+
     async fn handle_remind(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
         let arg = match arg {
             Some(a) => a,
             None => {
-                ctx.mention_reply("Usage: remind [user] <time> <message>").await?;
+                ctx.mention_reply("Usage: remind [user] <time> <message> | remind list | remind cancel <id>").await?;
                 return Ok(());
             }
         };
 
         let parts: Vec<&str> = arg.splitn(3, ' ').collect();
+
+        // Handle subcommands
+        if parts[0].eq_ignore_ascii_case("list") {
+            return self.handle_list(ctx).await;
+        }
+        if parts[0].eq_ignore_ascii_case("cancel") {
+            if parts.len() < 2 {
+                ctx.mention_reply("Usage: remind cancel <id>").await?;
+                return Ok(());
+            }
+            return self.handle_cancel(ctx, parts[1]).await;
+        }
         if parts.len() < 2 {
             ctx.mention_reply("Usage: remind [user] <time> <message>").await?;
             return Ok(());
@@ -110,27 +197,29 @@ impl RemindPlugin {
             .target_channel_id()
             .ok_or_else(|| format_err!("Could not determine channel"))?;
 
-        let remind_at = std::time::SystemTime::now()
+        let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs() as i64
-            + duration.as_secs() as i64;
+            .as_secs() as i64;
+        let remind_at = now + duration.as_secs() as i64;
 
         sqlx::query!(
-            "INSERT INTO reminders (channel_id, target_user, message, remind_at, created_by) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO reminders (channel_id, target_user, message, remind_at, created_at, created_by) VALUES ($1, $2, $3, $4, $5, $6)",
             channel_id,
             target_user,
             message,
             remind_at,
+            now,
             sender
         )
-        .execute(&ctx.get_db())
+        .execute(&self.db_pool)
         .await?;
 
         let duration_text = format_duration(duration.as_secs() as i64);
         ctx.mention_reply(&format!(
-            "I'll remind {} in {}",
+            "I'll remind {} in {}: \"{}\"",
             if target_user == sender { "you".to_string() } else { target_user },
-            duration_text
+            duration_text,
+            message
         ))
         .await?;
 
@@ -144,19 +233,20 @@ impl RemindPlugin {
 
         let reminders: Vec<Reminder> = sqlx::query_as!(
             Reminder,
-            "SELECT id, channel_id, target_user, message, created_by FROM reminders WHERE remind_at <= $1",
+            r#"SELECT id as "id!", channel_id, target_user, message, remind_at, created_at, created_by FROM reminders WHERE remind_at <= $1"#,
             now
         )
         .fetch_all(&self.db_pool)
         .await?;
 
         for reminder in reminders {
+            let age = format_duration(now - reminder.created_at);
             let msg = if reminder.created_by == reminder.target_user {
-                format!("{}: Reminder: {}", reminder.target_user, reminder.message)
+                format!("{}: Reminder ({} ago): {}", reminder.target_user, age, reminder.message)
             } else {
                 format!(
-                    "{}: Reminder from {}: {}",
-                    reminder.target_user, reminder.created_by, reminder.message
+                    "{}: Reminder from {} ({} ago): {}",
+                    reminder.target_user, reminder.created_by, age, reminder.message
                 )
             };
 
@@ -188,14 +278,14 @@ impl Plugin for RemindPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "remind".to_string(),
-            short_help: "usage: remind [user] <time> <message>".to_string(),
-            full_help: "Set a reminder. Time format: 30s, 5m, 2h, 1d, 1w".to_string(),
+            short_help: "usage: remind [user] <time> <message> | list | cancel <id>".to_string(),
+            full_help: "Set a reminder. Time format: 30s, 5m, 2h, 1d, 1w. Use 'remind list' to see pending reminders, 'remind cancel <id>' to cancel one.".to_string(),
         }]
     }
 
     async fn run(self, bot: Arc<Client>) -> Result<()> {
         let mut stream = bot.subscribe();
-        let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
 
         loop {
             tokio::select! {

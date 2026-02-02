@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS reminders (
     target_user TEXT NOT NULL,
     message TEXT NOT NULL,
     remind_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
     created_by TEXT NOT NULL
 );
 
