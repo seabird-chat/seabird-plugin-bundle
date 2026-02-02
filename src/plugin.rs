@@ -36,8 +36,13 @@ where
     let commands = plugin.command_metadata();
     let bot = bot.clone();
 
-    // TODO: we have a Result getting lost here
-    let handle = tokio::task::spawn(async move { plugin.run(bot).await });
+    let handle = tokio::task::spawn(async move {
+        let result = plugin.run(bot).await;
+        if let Err(ref e) = result {
+            error!("Plugin error: {}", e);
+        }
+        result
+    });
 
     Ok(PluginMetadata { handle, commands })
 }
