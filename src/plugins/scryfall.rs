@@ -154,6 +154,6 @@ impl Plugin for ScryfallPlugin {
             crate::check_err(&ctx, res).await;
         }
 
-        Err(format_err!("karma plugin lagged"))
+        Err(format_err!("scryfall plugin lagged"))
     }
 }
