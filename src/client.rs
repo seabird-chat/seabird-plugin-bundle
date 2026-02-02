@@ -262,6 +262,10 @@ impl Client {
             },
         );
     }
+
+    pub fn get_db(&self) -> sqlx::SqlitePool {
+        self.db_pool.clone()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -535,7 +539,7 @@ impl Context {
     }
 
     pub fn get_db(&self) -> sqlx::SqlitePool {
-        self.client.db_pool.clone()
+        self.client.get_db()
     }
 }
 
