@@ -47,11 +47,13 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "barista",
         "chance",
         "forecast",
+        "joke",
         "karma",
         "mention",
         "minecraft",
         "net_tools",
         "noaa",
+        "quotes",
         "remind",
         "riddle",
         "scryfall",
@@ -138,6 +140,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         ret.push(start_plugin::<plugins::NoaaPlugin>(&bot)?);
     }
 
+    if config.plugin_enabled("quotes") {
+        ret.push(start_plugin::<plugins::QuotesPlugin>(&bot)?);
+    }
+
     if config.plugin_enabled("riddle") {
         ret.push(start_plugin::<plugins::RiddlePlugin>(&bot)?);
     }
@@ -148,6 +154,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
 
     if config.plugin_enabled("introspection") {
         ret.push(start_plugin::<plugins::IntrospectionPlugin>(&bot)?);
+    }
+
+    if config.plugin_enabled("joke") {
+        ret.push(start_plugin::<plugins::JokePlugin>(&bot)?);
     }
 
     if config.plugin_enabled("help") {
