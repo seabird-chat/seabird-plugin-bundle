@@ -8,9 +8,15 @@ pub mod hex_slice;
 pub use hex_slice::HexSlice;
 
 pub fn to_sentence_case(s: &str) -> String {
+    if s.is_empty() {
+        return String::new();
+    }
+
     let mut graphemes = s.graphemes(true);
     let mut cap = String::with_capacity(s.len());
-    cap.push_str(&graphemes.next().unwrap().to_uppercase());
+    if let Some(first) = graphemes.next() {
+        cap.push_str(&first.to_uppercase());
+    }
     cap.push_str(graphemes.as_str());
     cap
 }
