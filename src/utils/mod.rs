@@ -51,4 +51,29 @@ mod tests {
         assert_eq!(clamp(-1.5, 0.0, 10.0), 0.0);
         assert_eq!(clamp(11.5, 0.0, 10.0), 10.0);
     }
+
+    #[test]
+    fn test_to_sentence_case() {
+        // Empty string
+        assert_eq!(to_sentence_case(""), "");
+
+        // Single character
+        assert_eq!(to_sentence_case("a"), "A");
+        assert_eq!(to_sentence_case("A"), "A");
+
+        // Normal strings
+        assert_eq!(to_sentence_case("hello"), "Hello");
+        assert_eq!(to_sentence_case("hello world"), "Hello world");
+
+        // Already capitalized
+        assert_eq!(to_sentence_case("Hello"), "Hello");
+        assert_eq!(to_sentence_case("Hello World"), "Hello World");
+
+        // All caps
+        assert_eq!(to_sentence_case("HELLO"), "HELLO");
+
+        // Unicode
+        assert_eq!(to_sentence_case("café"), "Café");
+        assert_eq!(to_sentence_case("über"), "Über");
+    }
 }
