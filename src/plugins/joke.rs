@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::prelude::*;
 
 const API_BASE: &str = "https://v2.jokeapi.dev/joke";
-const VALID_CATEGORIES: &[&str] = &["any", "misc", "programming", "pun", "spooky", "christmas", "dark"];
+const VALID_CATEGORIES: &[&str] = &["any", "misc", "programming", "pun", "spooky", "christmas"];
 
 pub struct JokePlugin {
     client: reqwest::Client,
@@ -81,15 +81,16 @@ impl JokePlugin {
 #[async_trait]
 impl Plugin for JokePlugin {
     fn new_from_env() -> Result<Self> {
-        Ok(JokePlugin {
-            client: reqwest::Client::new(),
-        })
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()?;
+        Ok(JokePlugin { client })
     }
 
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "joke".to_string(),
-            short_help: "usage: joke [category]. Get a random joke.".to_string(),
+            short_help: format!("usage: joke [category]. Categories: {}", VALID_CATEGORIES.join(", ")),
             full_help: format!("Gets a random joke. Categories: {}", VALID_CATEGORIES.join(", ")),
         }]
     }
