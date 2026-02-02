@@ -335,3 +335,65 @@ impl Plugin for RemindPlugin {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_duration() {
+        // Valid cases: (input, expected_seconds)
+        let valid_cases = [
+            ("5s", 5),
+            ("90s", 90),  // More than 1 minute
+            ("1m", 60),
+            ("5m", 300),
+            ("90m", 5400),  // More than 1 hour
+            ("2h", 7200),
+            ("25h", 90000),  // More than 1 day
+            ("1d", 86400),
+            ("1w", 604800),
+            // Case insensitive and whitespace
+            ("5M", 300),
+            (" 2h ", 7200),
+        ];
+
+        for (input, expected) in valid_cases {
+            assert_eq!(
+                parse_duration(input).unwrap(),
+                Duration::from_secs(expected),
+                "Failed parsing '{}'",
+                input
+            );
+        }
+
+        // Invalid cases
+        let invalid_cases = ["", "x", "5", "xm", "5x", "-5m"];
+        for input in invalid_cases {
+            assert!(
+                parse_duration(input).is_err(),
+                "Expected '{}' to fail parsing",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_duration() {
+        let cases = [
+            (1, "1 second"),
+            (5, "5 seconds"),
+            (60, "1 minute"),
+            (300, "5 minutes"),
+            (3600, "1 hour"),
+            (7200, "2 hours"),
+            (86400, "1 day"),
+            (172800, "2 days"),
+            (-60, "1 minute"), // negative values use unsigned_abs
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(format_duration(input), expected, "Failed formatting {}", input);
+        }
+    }
+}
