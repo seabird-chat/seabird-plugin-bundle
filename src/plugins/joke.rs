@@ -36,7 +36,11 @@ impl JokePlugin {
             .await?;
 
         if resp.error {
-            return Err(format_err!("{}", resp.message.unwrap_or_else(|| "Unknown API error".to_string())));
+            return Err(format_err!(
+                "{}",
+                resp.message
+                    .unwrap_or_else(|| "Unknown API error".to_string())
+            ));
         }
 
         Ok(resp)
@@ -60,7 +64,7 @@ impl JokePlugin {
                     ctx.reply(&delivery).await?;
                 }
             }
-            _ => {}
+            joke_type => return Err(format_err!("unexpected joke type {}", joke_type)),
         }
 
         Ok(())
@@ -79,7 +83,10 @@ impl Plugin for JokePlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "joke".to_string(),
-            short_help: format!("usage: joke [category]. Categories: {}", CATEGORIES.join(", ")),
+            short_help: format!(
+                "usage: joke [category]. Categories: {}",
+                CATEGORIES.join(", ")
+            ),
             full_help: format!("Gets a random joke. Categories: {}", CATEGORIES.join(", ")),
         }]
     }
