@@ -2,21 +2,24 @@
 
 ## Requirements
 
-- Rust 1.42
-- Postgres
+- Rust 1.42+
+- SQLite
 - Protobuf
 
 ## Settings
 
 Settings can either be included as a part of the environment or in a .env file.
 
-- `SEABIRD_HOST`
-- `SEABIRD_TOKEN`
-- `DATABASE_URL` - connection string for the database - can either be in connection string or url format
-- `SEABIRD_ENABLED_PLUGINS` - comma-separated list of enabled plugins - if this is empty, all plugins will be loaded
+- `SEABIRD_HOST` - hostname of the seabird server
+- `SEABIRD_TOKEN` - authentication token for the seabird server
+- `DATABASE_URL` - SQLite connection string (e.g., `sqlite://seabird.db`)
+- `SEABIRD_ENABLED_PLUGINS` - comma-separated list of enabled plugins - if empty, all plugins will be loaded
 - `SEABIRD_DISABLED_PLUGINS` - comma-separated list of plugins that should not be enabled
-- `DARKSKY_API_KEY` - needed for forecast/weather support
-- `OPENWEATHERMAP_API_KEY` - needed for forecast/weather support
+
+### Optional API Keys (required by specific plugins)
+
+- `OPENWEATHERMAP_API_KEY` - required by the `forecast` plugin for weather data
+- `GOOGLE_MAPS_API_KEY` - required by the `forecast` plugin for location lookups
 
 ## Writing a new plugin
 
