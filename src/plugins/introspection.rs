@@ -154,3 +154,31 @@ impl Plugin for IntrospectionPlugin {
         Err(format_err!("introspection plugin lagged"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_duration() -> Result<()> {
+        // Just minutes
+        assert_eq!(format_duration(&Duration::minutes(5))?, "00:05");
+        assert_eq!(format_duration(&Duration::minutes(45))?, "00:45");
+
+        // Hours and minutes
+        assert_eq!(format_duration(&Duration::hours(1))?, "01:00");
+        assert_eq!(format_duration(&Duration::new(5400, 0))?, "01:30"); // 1.5 hours
+        assert_eq!(format_duration(&(Duration::hours(23) + Duration::minutes(59)))?, "23:59");
+
+        // Days, hours, and minutes
+        assert_eq!(format_duration(&Duration::days(1))?, "1 days 00:00");
+        assert_eq!(format_duration(&(Duration::days(1) + Duration::hours(2) + Duration::minutes(30)))?, "1 days 02:30");
+        assert_eq!(format_duration(&Duration::days(7))?, "7 days 00:00");
+        assert_eq!(format_duration(&(Duration::days(10) + Duration::hours(5) + Duration::minutes(15)))?, "10 days 05:15");
+
+        // Edge case: zero duration
+        assert_eq!(format_duration(&Duration::ZERO)?, "00:00");
+
+        Ok(())
+    }
+}
