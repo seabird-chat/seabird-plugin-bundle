@@ -34,5 +34,8 @@ pub use self::introspection::IntrospectionPlugin;
 mod joke;
 pub use self::joke::JokePlugin;
 
+mod quotes;
+pub use self::quotes::QuotesPlugin;
+
 mod help;
 pub use self::help::HelpPlugin;
