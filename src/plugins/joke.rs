@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::prelude::*;
 
 const API_BASE: &str = "https://v2.jokeapi.dev/joke";
-const VALID_CATEGORIES: &[&str] = &["any", "misc", "programming", "pun", "spooky", "christmas"];
+const CATEGORIES: &[&str] = &["any", "misc", "programming", "pun", "spooky", "christmas"];
 
 pub struct JokePlugin {
     client: reqwest::Client,
@@ -43,20 +43,9 @@ impl JokePlugin {
     }
 
     async fn handle_joke(&self, ctx: &Arc<Context>, arg: Option<&str>) -> Result<()> {
-        let category = match arg {
-            Some(cat) if VALID_CATEGORIES.contains(&cat.to_lowercase().as_str()) => cat.to_string(),
-            Some(cat) => {
-                ctx.mention_reply(&format!(
-                    "Unknown category '{}'. Valid: {}",
-                    cat,
-                    VALID_CATEGORIES.join(", ")
-                )).await?;
-                return Ok(());
-            }
-            None => "Any".to_string(),
-        };
+        let category = arg.unwrap_or("Any");
 
-        let joke = self.fetch_joke(&category).await?;
+        let joke = self.fetch_joke(category).await?;
 
         match joke.joke_type.as_str() {
             "single" => {
@@ -90,8 +79,8 @@ impl Plugin for JokePlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "joke".to_string(),
-            short_help: format!("usage: joke [category]. Categories: {}", VALID_CATEGORIES.join(", ")),
-            full_help: format!("Gets a random joke. Categories: {}", VALID_CATEGORIES.join(", ")),
+            short_help: format!("usage: joke [category]. Categories: {}", CATEGORIES.join(", ")),
+            full_help: format!("Gets a random joke. Categories: {}", CATEGORIES.join(", ")),
         }]
     }
 
