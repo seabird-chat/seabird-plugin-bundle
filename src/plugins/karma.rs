@@ -1,9 +1,15 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
+use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::prelude::*;
+
+lazy_static! {
+    static ref KARMA_RE: Regex = Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#)
+        .expect("invalid karma regex");
+}
 
 #[derive(sqlx::FromRow, Debug)]
 pub struct Karma {
@@ -50,9 +56,7 @@ ON CONFLICT (name) DO UPDATE SET score=EXCLUDED.score+karma.score;",
     }
 }
 
-pub struct KarmaPlugin {
-    re: Regex,
-}
+pub struct KarmaPlugin;
 
 enum ParseState {
     Nothing,
@@ -131,9 +135,7 @@ fn parse_karma_change(change_str: &str) -> Result<i32> {
 
 impl KarmaPlugin {
     pub fn new() -> Self {
-        KarmaPlugin {
-            re: Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#).unwrap(),
-        }
+        KarmaPlugin
     }
 }
 
@@ -149,7 +151,7 @@ impl KarmaPlugin {
     }
 
     async fn handle_privmsg(&self, ctx: &Arc<Context>, msg: &str) -> Result<()> {
-        let captures: Vec<_> = self.re.captures_iter(msg).collect();
+        let captures: Vec<_> = KARMA_RE.captures_iter(msg).collect();
 
         if captures.is_empty() {
             return Ok(());

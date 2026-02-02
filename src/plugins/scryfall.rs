@@ -1,23 +1,25 @@
 use std::error::Error;
 use std::fmt::Write;
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use scryfall::{search::Search, Card};
 use url::Url;
 
 use crate::prelude::*;
 
-pub struct ScryfallPlugin {
-    re: Regex,
+lazy_static! {
+    static ref SCRYFALL_RE: Regex = Regex::new(r#"\[\[(.+?)\]\]"#)
+        .expect("invalid scryfall regex");
 }
+
+pub struct ScryfallPlugin;
 
 const SCRYFALL_SEARCH_URL: &str = "https://scryfall.com/search";
 
 impl ScryfallPlugin {
     pub fn new() -> Self {
-        ScryfallPlugin {
-            re: Regex::new(r#"\[\[(.+?)\]\]"#).unwrap(),
-        }
+        ScryfallPlugin
     }
 }
 
@@ -83,7 +85,7 @@ impl ScryfallPlugin {
     }
 
     async fn handle_privmsg(&self, ctx: &Arc<Context>, msg: &str) -> Result<()> {
-        let captures: Vec<_> = self.re.captures_iter(msg).collect();
+        let captures: Vec<_> = SCRYFALL_RE.captures_iter(msg).collect();
 
         if captures.is_empty() {
             return Ok(());
