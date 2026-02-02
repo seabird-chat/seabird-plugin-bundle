@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT nick, quote FROM quotes WHERE nick=$1 ORDER BY random() LIMIT 1;",
+  "describe": {
+    "columns": [
+      {
+        "name": "nick",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "quote",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "759e79ffa0012e64f6bf96cbbbe5dfe27bd7c0b628bb0008f7db33ad3ef501c3"
+}

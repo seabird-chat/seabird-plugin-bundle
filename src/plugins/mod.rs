@@ -31,5 +31,8 @@ pub use self::scryfall::ScryfallPlugin;
 mod introspection;
 pub use self::introspection::IntrospectionPlugin;
 
+mod quotes;
+pub use self::quotes::QuotesPlugin;
+
 mod help;
 pub use self::help::HelpPlugin;
