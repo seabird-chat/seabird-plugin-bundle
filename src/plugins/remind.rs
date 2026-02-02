@@ -142,7 +142,7 @@ impl RemindPlugin {
         let arg = match arg {
             Some(a) => a,
             None => {
-                ctx.mention_reply("Usage: remind [user] <time> <message> | remind list | remind cancel <id>").await?;
+                ctx.mention_reply("Usage: remind <user|me> <time> <message> | remind list | remind cancel <id>").await?;
                 return Ok(());
             }
         };
@@ -161,7 +161,7 @@ impl RemindPlugin {
             return self.handle_cancel(ctx, parts[1]).await;
         }
         if parts.len() < 2 {
-            ctx.mention_reply("Usage: remind [user] <time> <message>").await?;
+            ctx.mention_reply("Usage: remind <user|me> <time> <message>").await?;
             return Ok(());
         }
 
@@ -174,10 +174,15 @@ impl RemindPlugin {
             (sender.to_string(), parts[0], msg)
         } else {
             if parts.len() < 3 {
-                ctx.mention_reply("Usage: remind [user] <time> <message>").await?;
+                ctx.mention_reply("Usage: remind <user|me> <time> <message>").await?;
                 return Ok(());
             }
-            (parts[0].to_string(), parts[1], parts[2].to_string())
+            let target = if parts[0].eq_ignore_ascii_case("me") {
+                sender.to_string()
+            } else {
+                parts[0].to_string()
+            };
+            (target, parts[1], parts[2].to_string())
         };
 
         if message.is_empty() {
@@ -278,7 +283,7 @@ impl Plugin for RemindPlugin {
     fn command_metadata(&self) -> Vec<CommandMetadata> {
         vec![CommandMetadata {
             name: "remind".to_string(),
-            short_help: "usage: remind [user] <time> <message> | list | cancel <id>".to_string(),
+            short_help: "usage: remind <user|me> <time> <message> | list | cancel <id>".to_string(),
             full_help: "Set a reminder. Time format: 30s, 5m, 2h, 1d, 1w. Use 'remind list' to see pending reminders, 'remind cancel <id>' to cancel one.".to_string(),
         }]
     }
