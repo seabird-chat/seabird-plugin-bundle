@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM reminders WHERE id = $1 AND (created_by = $2 OR target_user = $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "fe22b047b068e08543e039bf77f7d0158a0bf55f88412504217efdab4a07eff2"
+}
