@@ -31,3 +31,24 @@ pub fn clamp<T: PartialOrd>(input: T, min: T, max: T) -> T {
         input
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clamp() {
+        // Test with integers
+        assert_eq!(clamp(5, 0, 10), 5);
+        assert_eq!(clamp(-5, 0, 10), 0);  // Below min
+        assert_eq!(clamp(15, 0, 10), 10); // Above max
+        assert_eq!(clamp(0, 0, 10), 0);   // At min
+        assert_eq!(clamp(10, 0, 10), 10); // At max
+        assert_eq!(clamp(5, 5, 5), 5);    // min == max
+
+        // Test with floats
+        assert_eq!(clamp(5.5, 0.0, 10.0), 5.5);
+        assert_eq!(clamp(-1.5, 0.0, 10.0), 0.0);
+        assert_eq!(clamp(11.5, 0.0, 10.0), 10.0);
+    }
+}
