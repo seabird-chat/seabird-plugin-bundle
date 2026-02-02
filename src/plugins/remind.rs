@@ -40,14 +40,6 @@ fn parse_duration(s: &str) -> Result<Duration> {
     Ok(Duration::from_secs(seconds))
 }
 
-fn looks_like_duration(s: &str) -> bool {
-    if s.len() < 2 {
-        return false;
-    }
-    let (num_str, unit) = s.split_at(s.len() - 1);
-    num_str.parse::<u64>().is_ok() && matches!(unit, "s" | "m" | "h" | "d" | "w")
-}
-
 fn format_duration(secs: i64) -> String {
     let secs = secs.unsigned_abs();
     if secs < 60 {
@@ -160,7 +152,7 @@ impl RemindPlugin {
             }
             return self.handle_cancel(ctx, parts[1]).await;
         }
-        if parts.len() < 2 {
+        if parts.len() < 3 {
             ctx.mention_reply("Usage: remind <user|me> <time> <message>").await?;
             return Ok(());
         }
@@ -169,26 +161,13 @@ impl RemindPlugin {
             .sender()
             .ok_or_else(|| format_err!("Could not determine sender"))?;
 
-        let (target_user, duration_str, message) = if looks_like_duration(parts[0]) {
-            let msg = if parts.len() > 1 { parts[1..].join(" ") } else { String::new() };
-            (sender.to_string(), parts[0], msg)
+        let target_user = if parts[0].eq_ignore_ascii_case("me") {
+            sender.to_string()
         } else {
-            if parts.len() < 3 {
-                ctx.mention_reply("Usage: remind <user|me> <time> <message>").await?;
-                return Ok(());
-            }
-            let target = if parts[0].eq_ignore_ascii_case("me") {
-                sender.to_string()
-            } else {
-                parts[0].to_string()
-            };
-            (target, parts[1], parts[2].to_string())
+            parts[0].to_string()
         };
-
-        if message.is_empty() {
-            ctx.mention_reply("Please provide a reminder message").await?;
-            return Ok(());
-        }
+        let duration_str = parts[1];
+        let message = parts[2];
 
         let duration = match parse_duration(duration_str) {
             Ok(d) => d,
