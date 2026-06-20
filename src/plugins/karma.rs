@@ -7,7 +7,12 @@ use regex::Regex;
 use crate::prelude::*;
 
 lazy_static! {
-    static ref KARMA_RE: Regex = Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#)
+    // A karma term is either a bare word (2+ word chars) or a quoted phrase.
+    // The quoted alternative is `"[^"]+"` rather than `".+?"` so a single term
+    // can never span across a closing quote into the next term. The trailing
+    // boundary accepts any non-term character (e.g. a comma) or end-of-input,
+    // not just whitespace, so `"a"++, "b"++` parses as two distinct terms.
+    static ref KARMA_RE: Regex = Regex::new(r#"([\w]{2,}|"[^"]+")([+-]{2,})(?:[^\w"+-]|$)"#)
         .expect("invalid karma regex");
 }
 
@@ -311,5 +316,66 @@ mod tests {
 
         assert!(parse_karma_change("++-++").is_err());
         assert!(parse_karma_change("--+--").is_err());
+    }
+
+    /// Extract (name, delta) pairs from a message exactly as `handle_privmsg`
+    /// does, minus the database round-trip, so we can assert on parsing alone.
+    fn parse_message(msg: &str) -> Vec<(String, i32)> {
+        KARMA_RE
+            .captures_iter(msg)
+            .map(|capture| {
+                let name = capture[1].trim_matches('"').to_string();
+                let change = parse_karma_change(&capture[2]).expect("valid karma change");
+                (name, change)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_quoted_terms_separated_by_space() {
+        assert_eq!(
+            parse_message(r#""central air"--- "heat pumps"+++"#),
+            vec![
+                ("central air".to_string(), -2),
+                ("heat pumps".to_string(), 2),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_quoted_terms_separated_by_comma() {
+        // Regression: a comma immediately after the operator used to force the
+        // non-greedy quoted match to swallow everything up to the next closing
+        // quote, collapsing both terms into one bogus entry.
+        assert_eq!(
+            parse_message(r#""central air"---, "heat pumps"+++"#),
+            vec![
+                ("central air".to_string(), -2),
+                ("heat pumps".to_string(), 2),
+            ]
+        );
+        assert_eq!(
+            parse_message(r#""central air"---, "heat pumps"---"#),
+            vec![
+                ("central air".to_string(), -2),
+                ("heat pumps".to_string(), -2),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_bare_words_separated_by_comma() {
+        assert_eq!(
+            parse_message("foo++, bar--"),
+            vec![("foo".to_string(), 1), ("bar".to_string(), -1)]
+        );
+    }
+
+    #[test]
+    fn test_quoted_term_may_contain_comma() {
+        assert_eq!(
+            parse_message(r#""heat, pumps"++"#),
+            vec![("heat, pumps".to_string(), 1)]
+        );
     }
 }
