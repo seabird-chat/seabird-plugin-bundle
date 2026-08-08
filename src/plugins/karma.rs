@@ -7,8 +7,8 @@ use regex::Regex;
 use crate::prelude::*;
 
 lazy_static! {
-    static ref KARMA_RE: Regex = Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#)
-        .expect("invalid karma regex");
+    static ref KARMA_RE: Regex =
+        Regex::new(r#"([\w]{2,}|".+?")([+-]{2,})(?:\s|$)"#).expect("invalid karma regex");
 }
 
 #[derive(sqlx::FromRow, Debug)]

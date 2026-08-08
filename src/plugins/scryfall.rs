@@ -9,8 +9,7 @@ use url::Url;
 use crate::prelude::*;
 
 lazy_static! {
-    static ref SCRYFALL_RE: Regex = Regex::new(r#"\[\[(.+?)\]\]"#)
-        .expect("invalid scryfall regex");
+    static ref SCRYFALL_RE: Regex = Regex::new(r#"\[\[(.+?)\]\]"#).expect("invalid scryfall regex");
 }
 
 pub struct ScryfallPlugin;

@@ -40,11 +40,11 @@ mod tests {
     fn test_clamp() {
         // Test with integers
         assert_eq!(clamp(5, 0, 10), 5);
-        assert_eq!(clamp(-5, 0, 10), 0);  // Below min
+        assert_eq!(clamp(-5, 0, 10), 0); // Below min
         assert_eq!(clamp(15, 0, 10), 10); // Above max
-        assert_eq!(clamp(0, 0, 10), 0);   // At min
+        assert_eq!(clamp(0, 0, 10), 0); // At min
         assert_eq!(clamp(10, 0, 10), 10); // At max
-        assert_eq!(clamp(5, 5, 5), 5);    // min == max
+        assert_eq!(clamp(5, 5, 5), 5); // min == max
 
         // Test with floats
         assert_eq!(clamp(5.5, 0.0, 10.0), 5.5);

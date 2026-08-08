@@ -23,7 +23,7 @@
       {
         formatter = pkgs.treefmt.withConfig {
           runtimeInputs = [
-            pkgs.nixfmt-rfc-style
+            pkgs.nixfmt
             pkgs.rustfmt
           ];
 
@@ -41,6 +41,27 @@
             };
           };
         };
+
+        packages.default =
+          let
+            cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+          in
+          pkgs.rustPlatform.buildRustPackage {
+            pname = "seabird-plugin-bundle";
+            version = cargoToml.package.version;
+            src = ./.;
+            cargoLock.lockFile = ./Cargo.lock;
+
+            nativeBuildInputs = [ pkgs.protobuf ];
+
+            # sqlx uses the checked-in .sqlx cache instead of a live database.
+            SQLX_OFFLINE = true;
+
+            # Flake builds run against the git tree without a .git directory, so
+            # git_version can't read the hash. Stamp a stable version string for
+            # the introspection plugin to report instead.
+            SEABIRD_GIT_VERSION = "v${cargoToml.package.version}-nix";
+          };
 
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = [

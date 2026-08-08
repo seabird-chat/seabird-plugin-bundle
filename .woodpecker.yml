@@ -1,13 +1,34 @@
-pipeline:
-  test:
-    image: rust:1.61
-    commands:
-      - cargo build --no-default-features
-      - cargo test --no-default-features
+when:
+  - event: pull_request
+  - event: push
+    branch: main
 
-  publish:
-    image: plugins/docker
-    repo: seabirdchat/seabird-plugin-bundle
-    secrets: [ docker_username, docker_password ]
-    when:
-      branch: main
+# Always build on arm64 so our environment matches
+labels:
+  platform: linux/arm64
+
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      # The protos are in a git submodule which are needed by builders
+      recursive: true
+
+steps:
+  check-fmt:
+    image: nixos/nix:2.35.1
+    environment:
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+    commands:
+      - nix fmt -- --ci
+
+  build:
+    image: nixos/nix:2.35.1
+    environment:
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+    commands:
+      - nix build --print-build-logs

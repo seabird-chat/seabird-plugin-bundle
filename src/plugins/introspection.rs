@@ -11,12 +11,15 @@ pub struct IntrospectionPlugin {
 
 const SEABIRD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// Pull the git hash, but allow us to fall back to the SOURCE_COMMIT variable
-// which is used in automated Docker Hub builds. For some reason Docker Hub
-// doesn't give us access to the full repository, so we have to use this as a
-// fallback. Thankfully, this will fail if the SOURCE_COMMIT variable also isn't
-// defined.
-const GIT_VERSION: &str = git_version!();
+// Pull the git hash from git at build time. When a `.git` directory isn't
+// available (for example, Nix flake builds, which build from the git tree, or
+// Docker Hub, which doesn't ship the full repository), CI can stamp the value
+// via the SEABIRD_GIT_VERSION environment variable instead. If neither is
+// present we fall back to "unknown" rather than failing the build.
+const GIT_VERSION: &str = match option_env!("SEABIRD_GIT_VERSION") {
+    Some(version) => version,
+    None => git_version!(fallback = "unknown"),
+};
 
 fn format_duration(dur: &Duration) -> Result<String> {
     let days = dur.whole_days();
@@ -168,13 +171,22 @@ mod tests {
         // Hours and minutes
         assert_eq!(format_duration(&Duration::hours(1))?, "01:00");
         assert_eq!(format_duration(&Duration::new(5400, 0))?, "01:30"); // 1.5 hours
-        assert_eq!(format_duration(&(Duration::hours(23) + Duration::minutes(59)))?, "23:59");
+        assert_eq!(
+            format_duration(&(Duration::hours(23) + Duration::minutes(59)))?,
+            "23:59"
+        );
 
         // Days, hours, and minutes
         assert_eq!(format_duration(&Duration::days(1))?, "1 days 00:00");
-        assert_eq!(format_duration(&(Duration::days(1) + Duration::hours(2) + Duration::minutes(30)))?, "1 days 02:30");
+        assert_eq!(
+            format_duration(&(Duration::days(1) + Duration::hours(2) + Duration::minutes(30)))?,
+            "1 days 02:30"
+        );
         assert_eq!(format_duration(&Duration::days(7))?, "7 days 00:00");
-        assert_eq!(format_duration(&(Duration::days(10) + Duration::hours(5) + Duration::minutes(15)))?, "10 days 05:15");
+        assert_eq!(
+            format_duration(&(Duration::days(10) + Duration::hours(5) + Duration::minutes(15)))?,
+            "10 days 05:15"
+        );
 
         // Edge case: zero duration
         assert_eq!(format_duration(&Duration::ZERO)?, "00:00");

@@ -345,12 +345,12 @@ mod tests {
         // Valid cases: (input, expected_seconds)
         let valid_cases = [
             ("5s", 5),
-            ("90s", 90),  // More than 1 minute
+            ("90s", 90), // More than 1 minute
             ("1m", 60),
             ("5m", 300),
-            ("90m", 5400),  // More than 1 hour
+            ("90m", 5400), // More than 1 hour
             ("2h", 7200),
-            ("25h", 90000),  // More than 1 day
+            ("25h", 90000), // More than 1 day
             ("1d", 86400),
             ("1w", 604800),
             // Case insensitive and whitespace
@@ -393,7 +393,12 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            assert_eq!(format_duration(input), expected, "Failed formatting {}", input);
+            assert_eq!(
+                format_duration(input),
+                expected,
+                "Failed formatting {}",
+                input
+            );
         }
     }
 }
