@@ -1,82 +1,79 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    {
-      self,
+    inputs@{
       nixpkgs,
-      rust-overlay,
-      flake-utils,
+      flake-parts,
+      ...
     }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ (import rust-overlay) ];
-        };
-      in
-      {
-        formatter = pkgs.treefmt.withConfig {
-          runtimeInputs = [
-            pkgs.nixfmt
-            pkgs.rustfmt
-          ];
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = nixpkgs.lib.systems.flakeExposed;
+      perSystem =
+        { system, pkgs, ... }:
+        {
+          formatter = pkgs.treefmt.withConfig {
+            runtimeInputs = [
+              pkgs.nixfmt
+              pkgs.rustfmt
+            ];
 
-          settings = {
-            on-unmatched = "info";
+            settings = {
+              on-unmatched = "info";
 
-            formatter.nixfmt = {
-              command = "nixfmt";
-              includes = [ "*.nix" ];
-            };
+              formatter.nixfmt = {
+                command = "nixfmt";
+                includes = [ "*.nix" ];
+              };
 
-            formatter.rustfmt = {
-              command = "rustfmt";
-              includes = [ "*.rs" ];
+              formatter.rustfmt = {
+                command = "rustfmt";
+                includes = [ "*.rs" ];
+              };
             };
           };
-        };
 
-        packages.default =
-          let
-            cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-          in
-          pkgs.rustPlatform.buildRustPackage {
-            pname = "seabird-plugin-bundle";
-            version = cargoToml.package.version;
-            src = ./.;
-            cargoLock.lockFile = ./Cargo.lock;
+          packages.default =
+            let
+              version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+            in
+            pkgs.rustPlatform.buildRustPackage {
+              inherit version;
 
-            nativeBuildInputs = [ pkgs.protobuf ];
+              pname = "seabird-plugin-bundle";
+              src = ./.;
+              cargoLock.lockFile = ./Cargo.lock;
 
-            # sqlx uses the checked-in .sqlx cache instead of a live database.
-            SQLX_OFFLINE = true;
+              nativeBuildInputs = [ pkgs.protobuf ];
 
-            # Flake builds run against the git tree without a .git directory, so
-            # git_version can't read the hash. Stamp a stable version string for
-            # the introspection plugin to report instead.
-            SEABIRD_GIT_VERSION = "v${cargoToml.package.version}-nix";
+              # sqlx uses the checked-in .sqlx cache instead of a live database.
+              SQLX_OFFLINE = true;
+
+              # Flake builds run against the git tree without a .git directory, so
+              # git_version can't read the hash. Stamp a stable version string for
+              # the introspection plugin to report instead.
+              SEABIRD_GIT_VERSION = "v${version}-nix";
+            };
+
+          devShells.default = pkgs.mkShell {
+            nativeBuildInputs = [
+              pkgs.cargo
+              pkgs.rustc
+              pkgs.rust-analyzer
+              pkgs.sqlx-cli
+              pkgs.protobuf
+              pkgs.sqlite
+            ];
+
+            RUST_BACKTRACE = 1;
+            DATABASE_URL = "sqlite://seabird.db";
           };
-
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = [
-            (pkgs.rust-bin.stable."1.93.0".default.override {
-              extensions = [ "rust-src" ];
-            })
-            pkgs.rust-analyzer
-            pkgs.sqlx-cli
-            pkgs.protobuf
-            pkgs.sqlite
-          ];
-
-          RUST_BACKTRACE = 1;
-          DATABASE_URL = "sqlite://seabird.db";
         };
-      }
-    );
+    };
 }
