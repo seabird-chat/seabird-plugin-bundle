@@ -1,6 +1,6 @@
 [package]
 name = "seabird-plugin-bundle"
-version = "0.2.0"
+version = "0.2.4-dev"
 authors = ["Kaleb Elwert <belak@coded.io>"]
 edition = "2021"
 
