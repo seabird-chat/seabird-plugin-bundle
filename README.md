@@ -12,7 +12,7 @@ Settings can either be included as a part of the environment or in a .env file.
 
 - `SEABIRD_HOST` - hostname of the seabird server
 - `SEABIRD_TOKEN` - authentication token for the seabird server
-- `DATABASE_URL` - SQLite connection string (e.g., `sqlite://seabird.db`)
+- `DATABASE_URL` - SQLite connection string (e.g., `sqlite://seabird.db`) - the database file is created if it does not exist, and migrations run at startup
 - `SEABIRD_ENABLED_PLUGINS` - comma-separated list of enabled plugins - if empty, all plugins will be loaded
 - `SEABIRD_DISABLED_PLUGINS` - comma-separated list of plugins that should not be enabled
 

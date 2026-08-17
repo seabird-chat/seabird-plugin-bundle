@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::future::{select_all, FutureExt};
@@ -175,9 +176,13 @@ impl Client {
 
 impl Client {
     pub async fn new(config: ClientConfig) -> Result<Self> {
+        let db_options = sqlx::sqlite::SqliteConnectOptions::from_str(&config.db_url)
+            .with_context(|| format!("Invalid $DATABASE_URL: {}", config.db_url))?
+            .create_if_missing(true);
+
         let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
             .max_connections(config.db_pool_size)
-            .connect(&config.db_url)
+            .connect_with(db_options)
             .await?;
 
         crate::migrations::run(&db_pool).await?;
