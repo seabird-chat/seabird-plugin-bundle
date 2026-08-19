@@ -3,17 +3,6 @@ when:
   - event: push
     branch: main
 
-# Always build on arm64 so our environment matches
-labels:
-  platform: linux/arm64
-
-clone:
-  git:
-    image: woodpeckerci/plugin-git
-    settings:
-      # The protos are in a git submodule which are needed by builders
-      recursive: true
-
 steps:
   check-fmt:
     image: nixos/nix:2.35.1
