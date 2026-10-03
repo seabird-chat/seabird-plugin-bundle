@@ -52,6 +52,7 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
         "barista",
         "chance",
         "forecast",
+        "giphy",
         "joke",
         "karma",
         "mention",
@@ -127,6 +128,10 @@ pub async fn load(bot: Arc<Client>) -> Result<Vec<PluginMetadata>> {
 
     if config.plugin_enabled("forecast") {
         ret.push(start_plugin::<plugins::ForecastPlugin>(&bot)?);
+    }
+
+    if config.plugin_enabled("giphy") {
+        ret.push(start_plugin::<plugins::GiphyPlugin>(&bot)?);
     }
 
     if config.plugin_enabled("karma") {

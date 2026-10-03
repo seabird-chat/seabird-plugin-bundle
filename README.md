@@ -20,6 +20,7 @@ Settings can either be included as a part of the environment or in a .env file.
 
 - `OPENWEATHERMAP_API_KEY` - required by the `forecast` plugin for weather data
 - `GOOGLE_MAPS_API_KEY` - required by the `forecast` plugin for location lookups
+- `GIPHY_API_KEY` - required by the `giphy` plugin for GIF searches
 
 ## Writing a new plugin
 

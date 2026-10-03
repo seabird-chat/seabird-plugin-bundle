@@ -10,6 +10,9 @@ pub use self::chance::ChancePlugin;
 mod forecast;
 pub use self::forecast::ForecastPlugin;
 
+mod giphy;
+pub use self::giphy::GiphyPlugin;
+
 mod karma;
 pub use self::karma::KarmaPlugin;
 
